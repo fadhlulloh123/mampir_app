@@ -4,18 +4,26 @@ import 'package:latlong2/latlong.dart';
 import '../models/place_model.dart';
 import '../services/api_service.dart';
 import '../services/preference_service.dart';
-import 'place_detail_screen.dart';
+import '../services/recommendation_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/budget_filter_modal.dart';
 import 'add_place_screen.dart';
+import 'notification_screen.dart';
+import 'place_detail_screen.dart';
+import 'route_screen.dart';
+import 'search_screen.dart';
+import 'settings_screen.dart';
 
 /// ============================================================
-/// HOME SCREEN — HALAMAN UTAMA APLIKASI MAMPIR
+/// HOME SCREEN — SESUAI beranda.jpeg & SPESIFIKASI #8
 /// ============================================================
-/// Layar utama dengan BottomNavigationBar 3 tab:
-/// 1. Tab Explore: Rekomendasi tempat berbasis Smart Scoring,
-///    Quick Adjust budget & kota, serta filter tag.
-/// 2. Tab Peta: Visualisasi sebaran tempat di BARLINGMASCAKEB
-///    menggunakan OpenStreetMap (flutter_map) gratis tanpa API key.
-/// 3. Tab Favorit: Daftar tempat yang telah di-bookmark oleh pengguna.
+/// Fitur Lengkap:
+/// - Header: Pin Oranye + Dropdown BARLINGMASCAKEB + Lonceng Notifikasi + Pengaturan
+/// - Search Bar + Filter Modal
+/// - 5 Tombol Kategori Bulat Gradasi: Makan, Nongkrong, Cafe, Restoran, Lainnya
+/// - Rekomendasi untuk kamu (Featured Card & Carousel Cerdas)
+/// - Tempat Populer (2-Column Grid)
+/// - 4-Tab Bottom Navigation: Beranda, Cari, Favorit, Peta
 /// ============================================================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,380 +33,844 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Warna tema aplikasi MAMPIR (Material 3)
-  static const Color _primaryColor = Color(0xFFFF6B35); // Warm Orange
-  static const Color _secondaryColor = Color(0xFF004E64); // Deep Teal
-  static const Color _backgroundColor = Color(0xFFF8F9FA); // Soft Cream
-
   final ApiService _apiService = ApiService();
-  final PreferenceService _preferenceService = PreferenceService();
+  final PreferenceService _prefService = PreferenceService();
 
-  static const List<String> _cities = [
-    'Semua Wilayah',
-    'Banyumas',
+  int _currentTabIndex = 0; // 0: Beranda, 1: Cari, 2: Favorit, 3: Peta
+
+  // Data State
+  List<PlaceModel> _allPlaces = [];
+  bool _isLoading = true;
+
+  // Filter State
+  String _selectedRegion = 'Purwokerto / Banyumas';
+  int _userBudget = 25000;
+  Set<String> _userPreferences = {'WiFi', 'Colokan'};
+  Set<String> _favoriteIds = {};
+  String? _selectedCategory; // null = semua, or Makan, Nongkrong, Cafe, Restoran, Lainnya
+
+  // Map state
+  PlaceModel? _selectedMapPlace;
+
+  // Favorit tab category filter
+  String _selectedFavCategory = 'Semua';
+
+  static const List<String> _barlingmascakebRegions = [
+    'Purwokerto / Banyumas',
     'Purbalingga',
     'Banjarnegara',
     'Cilacap',
     'Kebumen',
   ];
 
-  static const List<String> _availableTags = [
-    'Cafe & Ngopi',
-    'Makanan Berat',
-    'Murah Meriah',
-    'Wi-Fi & Colokan',
-    'Outdoor/Santai',
-    'Buka 24 Jam',
-  ];
-
-  // Tab yang aktif (0: Explore, 1: Peta, 2: Favorit)
-  int _currentIndex = 0;
-
-  // Data tempat dari API Service
-  List<PlaceModel> _allPlaces = [];
-  bool _isLoading = true;
-
-  // Preferensi Pengguna
-  int _userBudget = 50000;
-  String _selectedCity = 'Semua Wilayah';
-  List<String> _userTags = [];
-  List<String> _favoriteIds = [];
-
-  // Filter tag aktif pada tab Explore
-  final Set<String> _activeFilterTags = {};
-
-  // Tempat yang dipilih pada tab Peta untuk preview card
-  PlaceModel? _selectedMapPlace;
-
   @override
   void initState() {
     super.initState();
-    _loadAllData();
+    _loadPreferencesAndData();
   }
 
-  /// Memuat tempat dari Web Service dan preferensi lokal secara bersamaan
-  Future<void> _loadAllData() async {
+  Future<void> _loadPreferencesAndData() async {
     setState(() => _isLoading = true);
-    try {
-      final results = await Future.wait([
-        _apiService.fetchPlaces(),
-        _preferenceService.getBudget(),
-        _preferenceService.getCity(),
-        _preferenceService.getTags(),
-        _preferenceService.getFavorites(),
-      ]);
 
-      if (mounted) {
-        setState(() {
-          _allPlaces = results[0] as List<PlaceModel>;
-          _userBudget = results[1] as int;
-          _selectedCity = results[2] as String;
-          _userTags = results[3] as List<String>;
-          _favoriteIds = results[4] as List<String>;
-          // Default filter tag awal mengikuti preferensi user jika ada
-          _activeFilterTags.addAll(_userTags);
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+    final region = await _prefService.getSelectedRegion();
+    final budget = await _prefService.getBudget();
+    final prefs = await _prefService.getUserPreferences();
+    final favs = await _prefService.getFavorites();
 
-  /// Refresh data favorit saja (dipanggil setelah kembali dari detail screen)
-  Future<void> _refreshFavorites() async {
-    final favs = await _preferenceService.getFavorites();
+    final places = await _apiService.fetchPlaces();
+
     if (mounted) {
-      setState(() => _favoriteIds = favs);
+      setState(() {
+        _selectedRegion = region;
+        _userBudget = budget;
+        if (prefs.isNotEmpty) _userPreferences = prefs.toSet();
+        _favoriteIds = favs.toSet();
+        _allPlaces = places;
+        _isLoading = false;
+      });
     }
   }
 
-  /// Toggle favorit dari list view
+  Future<void> _onRegionChanged(String? newRegion) async {
+    if (newRegion == null) return;
+    setState(() => _selectedRegion = newRegion);
+    await _prefService.saveSelectedRegion(newRegion);
+  }
+
   Future<void> _toggleFavorite(String placeId) async {
-    final newStatus = await _preferenceService.toggleFavorite(placeId);
-    await _refreshFavorites();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            newStatus
-                ? 'Disimpan ke daftar favorit'
-                : 'Dihapus dari daftar favorit',
-          ),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    final isFav = await _prefService.toggleFavorite(placeId);
+    setState(() {
+      if (isFav) {
+        _favoriteIds.add(placeId);
+      } else {
+        _favoriteIds.remove(placeId);
+      }
+    });
+  }
+
+  Future<void> _openFilterModal() async {
+    final result = await BudgetFilterModal.show(
+      context,
+      currentBudget: _userBudget,
+      currentPreferences: _userPreferences,
+    );
+
+    if (result != null) {
+      setState(() {
+        _userBudget = result.budget;
+        _userPreferences = result.preferences;
+      });
+      await _prefService.saveBudget(result.budget);
+      await _prefService.saveUserPreferences(result.preferences.toList());
     }
   }
 
-  /// Reset semua filter ke kondisi awal
-  Future<void> _resetFilter() async {
-    setState(() {
-      _selectedCity = 'Semua Wilayah';
-      _userBudget = 100000;
-      _activeFilterTags.clear();
-    });
-    await _preferenceService.saveCity('Semua Wilayah');
-    await _preferenceService.saveBudget(100000);
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.scaffoldBg,
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.gold),
+            )
+          : IndexedStack(
+              index: _currentTabIndex,
+              children: [
+                _buildHomeTab(),
+                _buildSearchTab(),
+                _buildFavoritesTab(),
+                _buildMapTab(),
+              ],
+            ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
   }
 
-  /// Filter tempat berdasarkan kota, budget, dan tag;
-  /// lalu diurutkan dengan algoritma Smart Scoring (kecocokan tag + rating)
-  List<PlaceModel> get _filteredAndSortedPlaces {
-    return _allPlaces.where((place) {
-      // 1. Filter Kota
-      if (_selectedCity != 'Semua Wilayah' && place.city != _selectedCity) {
-        return false;
-      }
-      // 2. Filter Budget (avgPrice <= userBudget)
-      if (place.avgPrice > _userBudget) {
-        return false;
-      }
-      // 3. Filter Tag (jika ada tag aktif, minimal cocok 1 tag)
-      if (_activeFilterTags.isNotEmpty &&
-          !place.tags.any((t) => _activeFilterTags.contains(t))) {
-        return false;
+  // ===========================================================================
+  // BOTTOM NAVIGATION BAR (4 TABS SESUAI SPESIFIKASI #8)
+  // ===========================================================================
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1426),
+        border: const Border(
+          top: BorderSide(color: Color(0xFF1E293B), width: 1.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.home_rounded, 'Beranda'),
+              _buildNavItem(1, Icons.search_rounded, 'Cari'),
+              _buildNavItem(2, Icons.favorite_rounded, 'Favorit'),
+              _buildNavItem(3, Icons.map_outlined, 'Peta'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isActive = _currentTabIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _currentTabIndex = index);
+      },
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 24,
+              color: isActive ? AppTheme.gold : const Color(0xFF64748B),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? AppTheme.gold : const Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // TAB 1: BERANDA (SESUAI beranda.jpeg)
+  // ===========================================================================
+  Widget _buildHomeTab() {
+    // Jalankan Algoritma Rekomendasi Cerdas Hybrid
+    final recommendations = RecommendationService.getRecommendations(
+      allPlaces: _allPlaces,
+      userBudget: _userBudget,
+      selectedRegion: _selectedRegion,
+      selectedCategory: _selectedCategory,
+      userPreferences: _userPreferences.toList(),
+    );
+
+    // Tempat Populer di wilayah terpilih
+    final popularPlaces = _allPlaces.where((p) {
+      if (_selectedRegion.isNotEmpty) {
+        final reg = _selectedRegion.split('/')[0].trim().toLowerCase();
+        if (!p.city.toLowerCase().contains(reg)) {
+          return false;
+        }
       }
       return true;
-    }).toList()
-      ..sort((a, b) {
-        // Smart Scoring: (matchScore * 1.5) + rating
-        final scoreA = (a.matchScore(_userTags) * 1.5) + a.rating;
-        final scoreB = (b.matchScore(_userTags) * 1.5) + b.rating;
-        return scoreB.compareTo(scoreA); // Descending (tertinggi di atas)
-      });
-  }
+    }).toList();
+    popularPlaces.sort((a, b) => b.reviewCount.compareTo(a.reviewCount));
 
-  /// Format angka ke Rupiah (cth: 25.000)
-  String formatRupiah(int amount) {
-    final str = amount.toString();
-    final result = StringBuffer();
-    for (int i = 0; i < str.length; i++) {
-      if (i > 0 && (str.length - i) % 3 == 0) {
-        result.write('.');
-      }
-      result.write(str[i]);
-    }
-    return result.toString();
-  }
+    final featured = recommendations.isNotEmpty
+        ? recommendations.first.place
+        : (_allPlaces.isNotEmpty ? _allPlaces.first : null);
 
-  /// Bottom Sheet untuk Quick Adjust (Budget, Kota, & Tag)
-  void _showQuickAdjustBottomSheet() {
-    double tempBudget = _userBudget.toDouble();
-    String tempCity = _selectedCity;
-    final Set<String> tempTags = Set.from(_userTags);
+    return Stack(
+      children: [
+        // Background Mandala Batik
+        Positioned(
+          top: 0,
+          right: 0,
+          width: 280,
+          height: 280,
+          child: CustomPaint(
+            painter: MandalaOrnamentPainter(scale: 0.95),
+          ),
+        ),
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        SafeArea(
+          child: RefreshIndicator(
+            color: AppTheme.gold,
+            backgroundColor: AppTheme.surfaceNavy,
+            onRefresh: _loadPreferencesAndData,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+
+                  // 1. Header: Pin Oranye + Dropdown BARLINGMASCAKEB + Lonceng
+                  _buildTopHeader(),
+                  const SizedBox(height: 18),
+
+                  // 2. Search Bar + Filter Button
+                  _buildSearchBar(),
+                  const SizedBox(height: 22),
+
+                  // 3. Section Kategori
+                  _buildCategorySection(),
+                  const SizedBox(height: 26),
+
+                  // 4. Section "Rekomendasi untuk kamu"
+                  _buildRecommendationSection(featured, recommendations),
+                  const SizedBox(height: 26),
+
+                  // 5. Section "Tempat Populer"
+                  _buildPopularSection(popularPlaces),
+                  const SizedBox(height: 30),
+                ],
               ),
-              child: SingleChildScrollView(
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 1. Top Header: Pin Oranye + Region Dropdown + Bell + Setting Icon
+  Widget _buildTopHeader() {
+    return Row(
+      children: [
+        // Pin Oranye
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppTheme.orange.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.location_on,
+            color: AppTheme.orange,
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Dropdown Wilayah
+        Expanded(
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedRegion,
+              isDense: true,
+              dropdownColor: AppTheme.surfaceNavy,
+              icon: const Icon(Icons.keyboard_arrow_down,
+                  color: Colors.white, size: 20),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+              items: _barlingmascakebRegions.map((region) {
+                return DropdownMenuItem<String>(
+                  value: region,
+                  child: Text(
+                    region,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: _onRegionChanged,
+            ),
+          ),
+        ),
+
+        // Tombol Tambah Tempat Baru (+)
+        IconButton(
+          icon: const Icon(Icons.add_circle_outline,
+              color: AppTheme.gold, size: 24),
+          tooltip: 'Tambah Tempat Baru',
+          onPressed: () async {
+            final res = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (ctx) => const AddPlaceScreen()),
+            );
+            if (res == true) _loadPreferencesAndData();
+          },
+        ),
+
+        // Lonceng Notifikasi
+        IconButton(
+          icon: const Icon(Icons.notifications_none_rounded,
+              color: AppTheme.gold, size: 26),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (ctx) => const NotificationScreen()),
+            );
+          },
+        ),
+
+        // Pengaturan
+        IconButton(
+          icon: const Icon(Icons.settings_outlined,
+              color: Colors.white70, size: 24),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (ctx) => const SettingsScreen()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  /// 2. Search Bar + Filter Button (Sesuai mockup)
+  Widget _buildSearchBar() {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: AppTheme.searchNavy,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppTheme.borderNavy),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          const Icon(Icons.search, color: AppTheme.textMuted, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => SearchScreen(
+                      allPlaces: _allPlaces,
+                      autoFocus: true,
+                    ),
+                  ),
+                );
+              },
+              behavior: HitTestBehavior.opaque,
+              child: const Text(
+                'Cari tempat makan / nongkrong...',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 24,
+            color: AppTheme.borderNavy,
+          ),
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, color: AppTheme.gold, size: 22),
+            onPressed: _openFilterModal,
+            tooltip: 'Filter Budget & Preferensi',
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+
+  /// 3. Section Kategori: 5 Tombol Lingkaran Bergradasi Emas-Oranye
+  Widget _buildCategorySection() {
+    final categories = [
+      {'name': 'Makan', 'icon': Icons.ramen_dining_rounded},
+      {'name': 'Nongkrong', 'icon': Icons.wine_bar_rounded},
+      {'name': 'Cafe', 'icon': Icons.coffee_rounded},
+      {'name': 'Restoran', 'icon': Icons.restaurant_rounded},
+      {'name': 'Lainnya', 'icon': Icons.more_horiz_rounded},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Kategori',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: categories.map((cat) {
+            final name = cat['name'] as String;
+            final isSelected = _selectedCategory == name;
+
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (_selectedCategory == name) {
+                    _selectedCategory = null;
+                  } else {
+                    _selectedCategory = name;
+                  }
+                });
+              },
+              child: Column(
+                children: [
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? AppTheme.warmGradient
+                          : AppTheme.primaryGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.orange.withValues(alpha: 0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      cat['icon'] as IconData,
+                      size: 26,
+                      color: const Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    name,
+                    style: TextStyle(
+                      color: isSelected ? AppTheme.gold : Colors.white,
+                      fontSize: 13,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  /// 4. Section "Rekomendasi untuk kamu"
+  Widget _buildRecommendationSection(
+      PlaceModel? featured, List<RecommendationResult> recs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Rekomendasi untuk kamu',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => SearchScreen(allPlaces: _allPlaces),
+                  ),
+                );
+              },
+              child: const Text(
+                'Lihat Semua',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.gold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        if (featured == null)
+          const Center(
+            child: Text(
+              'Belum ada rekomendasi tempat',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          )
+        else
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) => PlaceDetailScreen(
+                    place: featured,
+                    userBudget: _userBudget,
+                  ),
+                ),
+              );
+            },
+            child: Stack(
+              children: [
+                // Featured Card Container
+                Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.borderNavy),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Image
+                        Image.network(
+                          featured.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, st) => Container(
+                            color: AppTheme.surfaceNavy,
+                            child: const Icon(Icons.restaurant,
+                                color: AppTheme.orange, size: 50),
+                          ),
+                        ),
+
+                        // Dark Gradient Overlay
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.2),
+                                Colors.black.withValues(alpha: 0.85),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Text Details
+                        Positioned(
+                          left: 16,
+                          right: 16,
+                          bottom: 16,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                featured.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${featured.category} • ${featured.priceRange}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star_rounded,
+                                      color: AppTheme.gold, size: 18),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${featured.rating.toStringAsFixed(1)} (${featured.formattedReviewCount})',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Icon(Icons.location_on,
+                                      color: AppTheme.orange, size: 14),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    featured.formattedDistance(),
+                                    style: const TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Tombol Hati (Favorit)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black.withValues(alpha: 0.5),
+                    radius: 20,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        _favoriteIds.contains(featured.id)
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: _favoriteIds.contains(featured.id)
+                            ? AppTheme.orange
+                            : Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () => _toggleFavorite(featured.id),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 5. Section "Tempat Populer" (2-Column Grid)
+  Widget _buildPopularSection(List<PlaceModel> places) {
+    final list = places.take(6).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Tempat Populer',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => SearchScreen(allPlaces: _allPlaces),
+                  ),
+                );
+              },
+              child: const Text(
+                'Lihat Semua',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.gold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 14,
+            childAspectRatio: 0.82,
+          ),
+          itemCount: list.length,
+          itemBuilder: (context, index) {
+            final place = list[index];
+
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => PlaceDetailScreen(
+                      place: place,
+                      userBudget: _userBudget,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.cardNavy,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.borderNavy),
+                ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Handle Bar
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
+                    // Photo
+                    ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.network(
+                        place.imageUrl,
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, st) => Container(
+                          height: 100,
+                          color: AppTheme.surfaceNavy,
+                          child: const Icon(Icons.store, color: AppTheme.orange),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Ubah Filter & Preferensi',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF2B2D42),
+
+                    // Info
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            place.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 10),
-
-                    // 1. Pilih Kota
-                    const Text(
-                      'Wilayah',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2B2D42),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: _backgroundColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: tempCity,
-                          isExpanded: true,
-                          items: _cities.map((city) {
-                            return DropdownMenuItem(
-                              value: city,
-                              child: Text(city,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setModalState(() => tempCity = val);
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-
-                    // 2. Budget Slider
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Budget Maksimal per Orang',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF2B2D42),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${place.category} • ${place.priceRange}',
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        Text(
-                          'Rp${formatRupiah(tempBudget.toInt())}',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: _primaryColor,
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded,
+                                  color: AppTheme.gold, size: 14),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${place.rating.toStringAsFixed(1)} (${place.formattedReviewCount})',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                place.formattedDistance(),
+                                style: const TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: _primaryColor,
-                        inactiveTrackColor: _primaryColor.withValues(alpha: 0.2),
-                        thumbColor: _primaryColor,
-                      ),
-                      child: Slider(
-                        min: 10000,
-                        max: 100000,
-                        divisions: 18,
-                        value: tempBudget,
-                        label: 'Rp${formatRupiah(tempBudget.toInt())}',
-                        onChanged: (val) {
-                          setModalState(() => tempBudget = val);
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // 3. Tag Preferensi
-                    const Text(
-                      'Suasana Favorit',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2B2D42),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _availableTags.map((tag) {
-                        final isSel = tempTags.contains(tag);
-                        return FilterChip(
-                          label: Text(tag),
-                          selected: isSel,
-                          selectedColor: _secondaryColor,
-                          backgroundColor: _backgroundColor,
-                          checkmarkColor: Colors.white,
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isSel ? Colors.white : const Color(0xFF2B2D42),
-                          ),
-                          onSelected: (selected) {
-                            setModalState(() {
-                              if (selected) {
-                                tempTags.add(tag);
-                              } else {
-                                tempTags.remove(tag);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Tombol Simpan
-                    SizedBox(
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final newBudget = tempBudget.toInt();
-                          final newCity = tempCity;
-                          final newTags = tempTags.toList();
-
-                          await _preferenceService.saveBudget(newBudget);
-                          await _preferenceService.saveCity(newCity);
-                          await _preferenceService.saveTags(newTags);
-
-                          if (mounted) {
-                            setState(() {
-                              _userBudget = newBudget;
-                              _selectedCity = newCity;
-                              _userTags = newTags;
-                              _activeFilterTags.clear();
-                              _activeFilterTags.addAll(newTags);
-                            });
-                            Navigator.pop(context);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          'Terapkan Preferensi',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w700),
-                        ),
+                        ],
                       ),
                     ),
                   ],
@@ -406,631 +878,309 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'MAMPIR',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-                color: _primaryColor,
-              ),
-            ),
-            Text(
-              'Kuliner & Nongkrong BARLINGMASCAKEB',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_location_alt_outlined, color: _primaryColor),
-            tooltip: 'Usulkan Tempat Baru',
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddPlaceScreen(),
-                ),
-              );
-              if (result == true) {
-                _loadAllData();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: _secondaryColor),
-            tooltip: 'Segarkan Data',
-            onPressed: _loadAllData,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: _primaryColor),
-                  SizedBox(height: 16),
-                  Text(
-                    'Mengambil data tempat mampir...',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF6C757D),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : IndexedStack(
-              index: _currentIndex,
-              children: [
-                _buildExploreTab(),
-                _buildMapTab(),
-                _buildFavoritesTab(),
-              ],
-            ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-            // Jika berpindah ke favorit, segarkan datanya
-            if (index == 2) _refreshFavorites();
-          });
-        },
-        backgroundColor: Colors.white,
-        selectedItemColor: _primaryColor,
-        unselectedItemColor: Colors.grey.shade500,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.explore_rounded),
-            label: 'Explore',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map_rounded),
-            label: 'Peta',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_rounded),
-            label: 'Favorit',
-          ),
-        ],
-      ),
+      ],
     );
   }
 
   // ===========================================================================
-  // TAB 1: EXPLORE
+  // TAB 2: CARI (MENYEDIAKAN SEARCHSCREEN LENGKAP DENGAN RIWAYAT & FILTER)
   // ===========================================================================
-  Widget _buildExploreTab() {
-    final places = _filteredAndSortedPlaces;
-
-    return RefreshIndicator(
-      color: _primaryColor,
-      onRefresh: _loadAllData,
-      child: CustomScrollView(
-        slivers: [
-          // Quick Adjust Bar di bagian atas
-          SliverToBoxAdapter(
-            child: _buildQuickAdjustHeader(),
-          ),
-
-          // Filter Chips Horizontal untuk Tag
-          SliverToBoxAdapter(
-            child: _buildTagFilterBar(),
-          ),
-
-          // Header Jumlah Hasil
-          SliverToBoxAdapter(
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${places.length} Tempat Ditemukan',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF6C757D),
-                    ),
-                  ),
-                  if (_activeFilterTags.isNotEmpty ||
-                      _selectedCity != 'Semua Wilayah' ||
-                      _userBudget < 100000)
-                    GestureDetector(
-                      onTap: _resetFilter,
-                      child: const Text(
-                        'Reset Filter',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _primaryColor,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          // List Cards Tempat atau Empty State
-          if (places.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _buildEmptyState(),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final place = places[index];
-                    return _buildPlaceCard(place);
-                  },
-                  childCount: places.length,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+  Widget _buildSearchTab() {
+    return SearchScreen(allPlaces: _allPlaces);
   }
 
-  /// Widget Quick Adjust menampilkan kota & budget saat ini
-  Widget _buildQuickAdjustHeader() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  // ===========================================================================
+  // TAB 3: FAVORIT (SESUAI simpanFavorit_mampir.jpeg)
+  // ===========================================================================
+  Widget _buildFavoritesTab() {
+    final savedPlaces = _allPlaces
+        .where((place) => _favoriteIds.contains(place.id))
+        .toList();
+
+    final filtered = _selectedFavCategory == 'Semua'
+        ? savedPlaces
+        : savedPlaces
+            .where((p) => p.category
+                .toLowerCase()
+                .contains(_selectedFavCategory.toLowerCase()))
+            .toList();
+
+    return Stack(
+      children: [
+        // Background Mandala
+        Positioned(
+          top: 0,
+          right: 0,
+          width: 260,
+          height: 260,
+          child: CustomPaint(
+            painter: MandalaOrnamentPainter(scale: 0.9),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Info Kota & Budget
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        ),
+
+        SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Favorit
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.location_on, size: 16, color: _primaryColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      _selectedCity,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF2B2D42),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.payments_outlined,
-                        size: 16, color: _secondaryColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Max: Rp${formatRupiah(_userBudget)} / orang',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Tombol Ubah / Edit
-          ElevatedButton.icon(
-            onPressed: _showQuickAdjustBottomSheet,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor.withValues(alpha: 0.12),
-              foregroundColor: _primaryColor,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            icon: const Icon(Icons.tune_rounded, size: 16),
-            label: const Text(
-              'Ubah',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Bar Tag Filter horizontal
-  Widget _buildTagFilterBar() {
-    return SizedBox(
-      height: 48,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _availableTags.length,
-        itemBuilder: (context, index) {
-          final tag = _availableTags[index];
-          final isSelected = _activeFilterTags.contains(tag);
-          return Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: FilterChip(
-              label: Text(tag),
-              selected: isSelected,
-              selectedColor: _secondaryColor,
-              backgroundColor: Colors.white,
-              checkmarkColor: Colors.white,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : const Color(0xFF495057),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected ? _secondaryColor : Colors.grey.shade300,
-                ),
-              ),
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _activeFilterTags.add(tag);
-                  } else {
-                    _activeFilterTags.remove(tag);
-                  }
-                });
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  /// Card untuk setiap item tempat makan
-  Widget _buildPlaceCard(PlaceModel place) {
-    final isWithinBudget = place.isWithinBudget(_userBudget);
-    final isFav = _favoriteIds.contains(place.id);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PlaceDetailScreen(
-                place: place,
-                userBudget: _userBudget,
-              ),
-            ),
-          );
-          _refreshFavorites();
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Gambar Utama + Badge Pas di Kantong + Favorite Icon
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(18)),
-                  child: Image.network(
-                    place.imageUrl,
-                    height: 160,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 160,
-                        color: _secondaryColor.withValues(alpha: 0.2),
-                        child: const Center(
-                          child: Icon(Icons.restaurant,
-                              size: 48, color: _secondaryColor),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Favorit',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-                // Badge "Pas di Kantong!"
-                if (isWithinBudget)
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2EC4B6),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle_rounded,
-                              size: 14, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text(
-                            'Pas di Kantong!',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                // Tombol Bookmark Favorit
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white.withValues(alpha: 0.9),
-                    radius: 18,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        isFav ? Icons.favorite : Icons.favorite_border,
-                        color: isFav ? Colors.redAccent : Colors.grey.shade700,
-                        size: 20,
-                      ),
-                      onPressed: () => _toggleFavorite(place.id),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Informasi Tempat
-            Padding(
-              padding: const EdgeInsets.all(14.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Nama & Rating
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          place.name,
+                        const SizedBox(height: 4),
+                        Text(
+                          '${savedPlaces.length} tempat disimpan',
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF2B2D42),
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w500,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.tune_rounded,
+                          color: AppTheme.gold, size: 24),
+                      onPressed: _openFilterModal,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Filter Chips: Semua, Cafe, Restoran
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: ['Semua', 'Cafe', 'Restoran'].map((cat) {
+                    final isSel = _selectedFavCategory == cat;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedFavCategory = cat),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient: isSel ? AppTheme.primaryGradient : null,
+                          color: isSel ? null : Colors.transparent,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSel ? Colors.transparent : AppTheme.gold,
+                          ),
+                        ),
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            color: isSel ? Colors.white : AppTheme.gold,
+                            fontWeight:
+                                isSel ? FontWeight.w800 : FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.amber.shade200),
-                        ),
-                        child: Row(
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Daftar Kartu Favorit
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star_rounded,
-                                size: 15, color: Colors.amber),
-                            const SizedBox(width: 2),
-                            Text(
-                              place.rating.toStringAsFixed(1),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF856404),
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceNavy,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppTheme.borderNavy),
                               ),
+                              child: const Icon(
+                                Icons.favorite_border_rounded,
+                                size: 54,
+                                color: AppTheme.orange,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Belum ada tempat favorit',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Sentuh ikon hati untuk menyimpan tempat makan favoritmu.',
+                              style: TextStyle(
+                                  color: AppTheme.textSecondary, fontSize: 13),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final place = filtered[index];
 
-                  // Kota & Kategori
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 14, color: _primaryColor),
-                      const SizedBox(width: 2),
-                      Text(
-                        place.city,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF6C757D),
-                        ),
+                          return GestureDetector(
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (ctx) => PlaceDetailScreen(
+                                    place: place,
+                                    userBudget: _userBudget,
+                                  ),
+                                ),
+                              );
+                              final favs = await _prefService.getFavorites();
+                              if (mounted) {
+                                setState(() => _favoriteIds = favs.toSet());
+                              }
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceNavy,
+                                borderRadius: BorderRadius.circular(18),
+                                border:
+                                    Border.all(color: AppTheme.borderNavy),
+                              ),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Image.network(
+                                      place.imageUrl,
+                                      width: 85,
+                                      height: 85,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (ctx, err, st) =>
+                                          Container(
+                                        width: 85,
+                                        height: 85,
+                                        color: AppTheme.searchNavy,
+                                        child: const Icon(Icons.store,
+                                            color: AppTheme.orange),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                place.name,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            GestureDetector(
+                                              onTap: () =>
+                                                  _toggleFavorite(place.id),
+                                              child: const Icon(
+                                                Icons.favorite,
+                                                color: AppTheme.orange,
+                                                size: 22,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.star_rounded,
+                                                color: AppTheme.gold,
+                                                size: 16),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              '${place.rating.toStringAsFixed(1)} (${place.formattedReviewCount})',
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '• ${place.formattedDistance()}',
+                                              style: const TextStyle(
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '${place.category} • ${place.priceRange}',
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '•  ${place.category}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Rentang Harga
-                  Text(
-                    place.priceRange,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Chips Tag Kecil
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: place.tags.take(3).map((tag) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: _backgroundColor,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Text(
-                          tag,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: _secondaryColor,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-  }
-
-  /// Tampilan Empty State jika tidak ada tempat yang cocok filter
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _primaryColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.search_off_rounded,
-                size: 60,
-                color: _primaryColor,
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Tidak Ada Tempat yang Sesuai',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF2B2D42),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Coba naikkan budget, pilih wilayah lain, atau hapus filter tag untuk melihat rekomendasi.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _resetFilter,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.restart_alt_rounded, size: 18),
-              label: const Text('Reset Filter'),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
   // ===========================================================================
-  // TAB 2: PETA (OPENSTREETMAP VIA FLUTTER_MAP)
+  // TAB 4: PETA (OPENSTREETMAP VIA FLUTTER_MAP)
   // ===========================================================================
   Widget _buildMapTab() {
-    final places = _filteredAndSortedPlaces;
-
     return Stack(
       children: [
         FlutterMap(
           options: const MapOptions(
-            initialCenter: LatLng(-7.45, 109.25), // Area BARLINGMASCAKEB
-            initialZoom: 9.5,
+            initialCenter: LatLng(-7.4244, 109.2302), // Purwokerto BARLINGMASCAKEB
+            initialZoom: 11.5,
           ),
           children: [
             TileLayer(
@@ -1038,26 +1188,28 @@ class _HomeScreenState extends State<HomeScreen> {
               userAgentPackageName: 'com.mampir.mampir_app',
             ),
             MarkerLayer(
-              markers: places.map((place) {
+              markers: _allPlaces.map((place) {
                 final isSelected = _selectedMapPlace?.id == place.id;
                 return Marker(
                   point: LatLng(place.latitude, place.longitude),
-                  width: isSelected ? 48 : 40,
-                  height: isSelected ? 48 : 40,
+                  width: isSelected ? 52 : 42,
+                  height: isSelected ? 52 : 42,
                   child: GestureDetector(
                     onTap: () {
                       setState(() => _selectedMapPlace = place);
                     },
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isSelected ? _secondaryColor : _primaryColor,
+                        gradient: isSelected
+                            ? AppTheme.warmGradient
+                            : AppTheme.primaryGradient,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2.5),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
+                            color: Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
                           ),
                         ],
                       ),
@@ -1074,34 +1226,36 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
 
-        // Map Header Banner
+        // Header Banner Peta
         Positioned(
-          top: 12,
+          top: 14,
           left: 16,
           right: 16,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.95),
-              borderRadius: BorderRadius.circular(12),
+              color: AppTheme.scaffoldBg.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.borderNavy),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 6,
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
                 ),
               ],
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, size: 16, color: _secondaryColor),
+                const Icon(Icons.location_on,
+                    size: 18, color: AppTheme.orange),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Menampilkan ${places.length} titik tempat di peta',
+                    'Menampilkan ${_allPlaces.length} tempat di BARLINGMASCAKEB',
                     style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF2B2D42),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -1110,7 +1264,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // Preview Card saat Marker Ditekan
+        // Preview Card saat Marker Peta Ditekan
         if (_selectedMapPlace != null)
           Positioned(
             left: 16,
@@ -1119,12 +1273,13 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                color: AppTheme.scaffoldBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.orange),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 12,
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -1132,17 +1287,17 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     child: Image.network(
                       _selectedMapPlace!.imageUrl,
                       width: 70,
                       height: 70,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
+                      errorBuilder: (ctx, err, st) => Container(
                         width: 70,
                         height: 70,
-                        color: _primaryColor.withValues(alpha: 0.1),
-                        child: const Icon(Icons.restaurant, color: _primaryColor),
+                        color: AppTheme.surfaceNavy,
+                        child: const Icon(Icons.store, color: AppTheme.orange),
                       ),
                     ),
                   ),
@@ -1155,208 +1310,96 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           _selectedMapPlace!.name,
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF2B2D42),
+                            color: Colors.white,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           '${_selectedMapPlace!.city} • ${_selectedMapPlace!.priceRange}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
+                            color: AppTheme.textSecondary,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
                           ),
                           maxLines: 1,
                         ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          height: 30,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => PlaceDetailScreen(
-                                    place: _selectedMapPlace!,
-                                    userBudget: _userBudget,
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (ctx) => PlaceDetailScreen(
+                                      place: _selectedMapPlace!,
+                                      userBudget: _userBudget,
+                                    ),
                                   ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.surfaceNavy,
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(
+                                    color: AppTheme.borderNavy),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                minimumSize: Size.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
                               ),
+                              child: const Text('Detail',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700)),
                             ),
-                            child: const Text(
-                              'Lihat Detail',
-                              style: TextStyle(
-                                  fontSize: 11, fontWeight: FontWeight.w700),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (ctx) => RouteScreen(
+                                        place: _selectedMapPlace!),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.orange,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                minimumSize: Size.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text('Rute',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700)),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () {
-                      setState(() => _selectedMapPlace = null);
-                    },
+                    icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                    onPressed: () =>
+                        setState(() => _selectedMapPlace = null),
                   ),
                 ],
               ),
             ),
           ),
       ],
-    );
-  }
-
-  // ===========================================================================
-  // TAB 3: FAVORIT / BOOKMARK
-  // ===========================================================================
-  Widget _buildFavoritesTab() {
-    final favoritePlaces = _allPlaces
-        .where((place) => _favoriteIds.contains(place.id))
-        .toList();
-
-    if (favoritePlaces.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.favorite_border_rounded,
-                  size: 64,
-                  color: Colors.redAccent,
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Belum Ada Tempat Favorit',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF2B2D42),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tandai tempat makan dan nongkrong yang kamu suka dengan menekan ikon hati.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: favoritePlaces.length,
-      itemBuilder: (context, index) {
-        final place = favoritePlaces[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 2,
-          shadowColor: Colors.black.withValues(alpha: 0.05),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(10),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                place.imageUrl,
-                width: 65,
-                height: 65,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 65,
-                  height: 65,
-                  color: _primaryColor.withValues(alpha: 0.1),
-                  child: const Icon(Icons.restaurant, color: _primaryColor),
-                ),
-              ),
-            ),
-            title: Text(
-              place.name,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF2B2D42),
-              ),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 2),
-                Text(
-                  '${place.city} • ${place.priceRange}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.star_rounded,
-                        size: 14, color: Colors.amber),
-                    const SizedBox(width: 2),
-                    Text(
-                      place.rating.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline_rounded,
-                  color: Colors.redAccent),
-              tooltip: 'Hapus dari Favorit',
-              onPressed: () => _toggleFavorite(place.id),
-            ),
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PlaceDetailScreen(
-                    place: place,
-                    userBudget: _userBudget,
-                  ),
-                ),
-              );
-              _refreshFavorites();
-            },
-          ),
-        );
-      },
     );
   }
 }

@@ -31,6 +31,9 @@ dependencies:
   # Digunakan di lib/services/preference_service.dart
   shared_preferences: ^2.3.5
 
+  # Package untuk format mata uang Rupiah & tanggal
+  intl: ^0.19.0
+
   # Package untuk membuka Google Maps dari aplikasi
   # Digunakan di place_detail_screen.dart tombol "Buka Rute"
   url_launcher: ^6.3.1
@@ -39,6 +42,18 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app_icon.jpeg"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/images/app_icon.jpeg"
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/

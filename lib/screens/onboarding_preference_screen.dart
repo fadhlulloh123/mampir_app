@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../services/preference_service.dart';
+import '../theme/app_theme.dart';
 import 'home_screen.dart';
 
 /// ============================================================
-/// ONBOARDING PREFERENCE SCREEN — MAMPIR APP
+/// ONBOARDING & WELCOME SCREEN — SESUAI SplashS contoh.jpeg
 /// ============================================================
-/// Layar pertama yang dilihat pengguna baru untuk mengatur:
-/// 1. Kota pilihan di wilayah BARLINGMASCAKEB
-/// 2. Budget maksimal per orang (Slider & Quick Pick Chips)
-/// 3. Tag preferensi / selera tempat nongkrong (Multi-select)
-///
-/// Setelah disimpan, preferensi ini digunakan oleh Smart Scoring
-/// di HomeScreen untuk merekomendasikan tempat terbaik.
+/// Step 1: Layar Selamat Datang (MAMPIR, Subjudul Emas, Ilustrasi, Tombol "Mulai")
+/// Step 2: Atur Budget, Wilayah BARLINGMASCAKEB, dan Preferensi
+/// Setelah selesai -> is_first_launch = false -> Masuk HomeScreen
 /// ============================================================
 class OnboardingPreferenceScreen extends StatefulWidget {
   const OnboardingPreferenceScreen({super.key});
@@ -23,64 +22,95 @@ class OnboardingPreferenceScreen extends StatefulWidget {
 
 class _OnboardingPreferenceScreenState
     extends State<OnboardingPreferenceScreen> {
-  // Warna tema aplikasi MAMPIR (Material 3)
-  static const Color _primaryColor = Color(0xFFFF6B35); // Warm Orange
-  static const Color _secondaryColor = Color(0xFF004E64); // Deep Teal
-  static const Color _backgroundColor = Color(0xFFF8F9FA); // Soft Cream
+  final PreferenceService _prefService = PreferenceService();
+  final PageController _pageController = PageController();
 
-  final PreferenceService _preferenceService = PreferenceService();
+  bool _isLoading = false;
 
-  // Daftar opsi kota BARLINGMASCAKEB
-  static const List<String> _cities = [
-    'Semua Wilayah',
-    'Banyumas',
+  // Preferensi pengguna
+  String _selectedRegion = 'Purwokerto / Banyumas';
+  int _selectedBudget = 25000;
+  final Set<String> _selectedPreferences = {'WiFi', 'Colokan', 'Nongkrong'};
+
+  late TextEditingController _budgetController;
+  final NumberFormat _currencyFormatter =
+      NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+
+  static const List<String> _regions = [
+    'Purwokerto / Banyumas',
     'Purbalingga',
     'Banjarnegara',
     'Cilacap',
     'Kebumen',
   ];
 
-  // Daftar tag preferensi yang tersedia
-  static const List<String> _availableTags = [
-    'Cafe & Ngopi',
-    'Makanan Berat',
-    'Murah Meriah',
-    'Wi-Fi & Colokan',
-    'Outdoor/Santai',
-    'Buka 24 Jam',
+  static const List<Map<String, dynamic>> _quickChips = [
+    {'label': '15K', 'value': 15000},
+    {'label': '25K', 'value': 25000},
+    {'label': '50K', 'value': 50000},
+    {'label': '75K', 'value': 75000},
+    {'label': '100K', 'value': 100000},
+    {'label': 'Bebas', 'value': 150000},
   ];
 
-  // Quick pick opsi budget
-  static const List<int> _quickBudgets = [20000, 35000, 50000, 75000];
+  static const List<String> _allPreferences = [
+    'WiFi',
+    'Colokan',
+    'AC',
+    'Parkir',
+    'Nongkrong',
+    'Outdoor',
+    'Indoor',
+    'Rooftop',
+    'Romantis',
+    'Ramah Hewan',
+    'Musik',
+  ];
 
-  // State input pengguna
-  String _selectedCity = 'Semua Wilayah';
-  double _currentBudget = 50000.0;
-  final Set<String> _selectedTags = {'Cafe & Ngopi', 'Murah Meriah'};
-  bool _isLoading = false;
-
-  /// Helper untuk memformat angka menjadi format Rupiah (cth: 50.000)
-  String formatRupiah(int amount) {
-    final str = amount.toString();
-    final result = StringBuffer();
-    for (int i = 0; i < str.length; i++) {
-      if (i > 0 && (str.length - i) % 3 == 0) {
-        result.write('.');
-      }
-      result.write(str[i]);
-    }
-    return result.toString();
+  @override
+  void initState() {
+    super.initState();
+    _budgetController = TextEditingController(
+      text: _currencyFormatter.format(_selectedBudget),
+    );
   }
 
-  /// Simpan semua preferensi dan lanjut ke HomeScreen
-  Future<void> _handleSaveAndContinue() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _budgetController.dispose();
+    super.dispose();
+  }
 
+  void _onBudgetSliderChanged(int val) {
+    setState(() {
+      _selectedBudget = val;
+      if (val >= 150000) {
+        _budgetController.text = 'Bebas';
+      } else {
+        _budgetController.text = _currencyFormatter.format(val);
+      }
+    });
+  }
+
+  void _onManualBudgetChanged(String val) {
+    final cleanDigits = val.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanDigits.isEmpty) return;
+    final int? parsed = int.tryParse(cleanDigits);
+    if (parsed != null) {
+      setState(() {
+        _selectedBudget = parsed.clamp(5000, 200000);
+      });
+    }
+  }
+
+  Future<void> _handleFinishOnboarding() async {
+    setState(() => _isLoading = true);
     try {
-      await _preferenceService.saveBudget(_currentBudget.toInt());
-      await _preferenceService.saveCity(_selectedCity);
-      await _preferenceService.saveTags(_selectedTags.toList());
-      await _preferenceService.setOnboarded();
+      await _prefService.saveBudget(_selectedBudget);
+      await _prefService.saveSelectedRegion(_selectedRegion);
+      await _prefService.saveUserPreferences(_selectedPreferences.toList());
+      await _prefService.setFirstLaunch(false);
 
       if (!mounted) return;
 
@@ -92,7 +122,7 @@ class _OnboardingPreferenceScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gagal menyimpan preferensi: $e'),
+          content: Text('Terjadi kesalahan: $e'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -104,351 +134,503 @@ class _OnboardingPreferenceScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 16),
-
-              // =================== HEADER SECTION ===================
-              Center(
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: _primaryColor.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.restaurant_menu_rounded,
-                    size: 38,
-                    color: _primaryColor,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'MAMPIR',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.0,
-                  color: _primaryColor,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Makan, Ampir, & Temukan Tempat Nongkrong Pas di Kantong se-BARLINGMASCAKEB',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: _secondaryColor,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // =================== CARD 1: PILIH WILAYAH ===================
-              _buildSectionCard(
-                icon: Icons.location_on_outlined,
-                title: 'Pilih Wilayah',
-                subtitle: 'Cari rekomendasi tempat di kota tujuanmu',
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedCity,
-                      isExpanded: true,
-                      icon: const Icon(Icons.keyboard_arrow_down, color: _primaryColor),
-                      items: _cities.map((city) {
-                        return DropdownMenuItem(
-                          value: city,
-                          child: Text(
-                            city,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2B2D42),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedCity = val);
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // =================== CARD 2: BUDGET SLIDER ===================
-              _buildSectionCard(
-                icon: Icons.payments_outlined,
-                title: 'Budget Maksimal per Orang',
-                subtitle: 'Sesuaikan dengan isi dompetmu saat ini',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Tampilan Angka Budget
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _primaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Rp${formatRupiah(_currentBudget.toInt())}',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: _primaryColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Slider Budget (10.000 - 100.000, step 5.000 -> 18 divisi)
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: _primaryColor,
-                        inactiveTrackColor: _primaryColor.withValues(alpha: 0.2),
-                        thumbColor: _primaryColor,
-                        overlayColor: _primaryColor.withValues(alpha: 0.15),
-                        trackHeight: 6,
-                        thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 10),
-                      ),
-                      child: Slider(
-                        min: 10000,
-                        max: 100000,
-                        divisions: 18,
-                        value: _currentBudget,
-                        label: 'Rp${formatRupiah(_currentBudget.toInt())}',
-                        onChanged: (val) {
-                          setState(() => _currentBudget = val);
-                        },
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Rp10.000',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600)),
-                        Text('Rp100.000',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600)),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Quick Pick Chips
-                    const Text(
-                      'Pilihan Cepat:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF6C757D),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _quickBudgets.map((budget) {
-                        final isSelected =
-                            _currentBudget.toInt() == budget;
-                        return ChoiceChip(
-                          label: Text('Rp${formatRupiah(budget)}'),
-                          selected: isSelected,
-                          selectedColor: _primaryColor,
-                          backgroundColor: Colors.white,
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? Colors.white : _secondaryColor,
-                          ),
-                          side: BorderSide(
-                            color: isSelected
-                                ? _primaryColor
-                                : Colors.grey.shade300,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() => _currentBudget = budget.toDouble());
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // =================== CARD 3: TAG PREFERENSI ===================
-              _buildSectionCard(
-                icon: Icons.tune_rounded,
-                title: 'Suasana & Kebutuhan',
-                subtitle: 'Pilih apa saja yang kamu cari saat mampir',
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _availableTags.map((tag) {
-                    final isSelected = _selectedTags.contains(tag);
-                    return FilterChip(
-                      label: Text(tag),
-                      selected: isSelected,
-                      selectedColor: _secondaryColor,
-                      backgroundColor: Colors.white,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.white : const Color(0xFF2B2D42),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: isSelected
-                              ? _secondaryColor
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedTags.add(tag);
-                          } else {
-                            _selectedTags.remove(tag);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // =================== SUBMIT BUTTON ===================
-              SizedBox(
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _handleSaveAndContinue,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryColor,
-                    foregroundColor: Colors.white,
-                    elevation: 3,
-                    shadowColor: _primaryColor.withValues(alpha: 0.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.explore_rounded, size: 22),
-                  label: Text(
-                    _isLoading ? 'Menyimpan...' : 'Cari Tempat Mampir!',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
+      backgroundColor: AppTheme.scaffoldBg,
+      body: Stack(
+        children: [
+          // Mandala Batik Background Decoration
+          Positioned(
+            top: 0,
+            right: 0,
+            width: 260,
+            height: 260,
+            child: CustomPaint(
+              painter: MandalaOrnamentPainter(scale: 0.9),
+            ),
           ),
-        ),
+          Positioned(
+            top: 0,
+            left: 0,
+            width: 180,
+            height: 180,
+            child: CustomPaint(
+              painter: MandalaOrnamentPainter(scale: 0.6),
+            ),
+          ),
+
+          SafeArea(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildWelcomePage(),
+                _buildPreferenceSetupPage(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  /// Helper untuk membuat Card section yang seragam dan elegan
-  Widget _buildSectionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Widget child,
-  }) {
+  /// Step 1: Halaman Selamat Datang (Sesuai SplashS contoh.jpeg)
+  Widget _buildWelcomePage() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+      child: Column(
+        children: [
+          const Spacer(flex: 1),
+
+          // Logo Pin & Mascot
+          Center(
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(70),
+                child: Image.asset(
+                  'assets/images/app_icon.jpeg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.restaurant_rounded,
+                      size: 64,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Judul Utama "MAMPIR"
+          const Text(
+            'MAMPIR',
+            style: TextStyle(
+              fontSize: 38,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2.0,
+              color: Colors.white,
+              fontFamily: 'serif',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Subjudul Emas
+          const Text(
+            'Makan, Ampir, Pilih, dan Rekomendasi',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.gold,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Deskripsi
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Tempat Makan dan Nongkrong Berdasarkan Budget dan Preferensi Kamu',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ),
+
+          const Spacer(flex: 2),
+
+          // Ilustrasi Cafe / Urban Line Art
+          Container(
+            height: 160,
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: AppTheme.surfaceNavy.withValues(alpha: 0.3),
+              border: Border.all(color: AppTheme.borderNavy.withValues(alpha: 0.5)),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.storefront_rounded,
+                  size: 90,
+                  color: AppTheme.borderNavy,
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildFeatureMiniCard(Icons.local_cafe_rounded, 'Cafe & Resto'),
+                    _buildFeatureMiniCard(Icons.payments_rounded, 'Pas Budget'),
+                    _buildFeatureMiniCard(Icons.map_rounded, 'Se-BARLINGMASCAKEB'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 28),
+
+          // Tombol "Mulai"
+          Container(
+            width: double.infinity,
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.orange.withValues(alpha: 0.4),
+                  blurRadius: 16,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: () {
+                _pageController.animateToPage(
+                  1,
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeInOut,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
+              ),
+              child: const Text(
+                'Mulai',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureMiniCard(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+        color: AppTheme.scaffoldBg.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.borderNavy),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppTheme.gold, size: 22),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Step 2: Pengaturan Awal (Wilayah, Budget & Preferensi)
+  Widget _buildPreferenceSetupPage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Tombol Kembali
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 20, color: _primaryColor),
+              IconButton(
+                onPressed: () {
+                  _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2B2D42),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 8),
+              const Text(
+                'Atur Preferensi Awal',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          child,
+
+          // Pilih Wilayah
+          const Text(
+            'Wilayah Utama Kamu',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: AppTheme.searchNavy,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.borderNavy),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedRegion,
+                isExpanded: true,
+                dropdownColor: AppTheme.surfaceNavy,
+                icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.gold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+                items: _regions.map((region) {
+                  return DropdownMenuItem<String>(
+                    value: region,
+                    child: Text(region),
+                  );
+                }).toList(),
+                onChanged: (newRegion) {
+                  if (newRegion != null) {
+                    setState(() => _selectedRegion = newRegion);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Budget Maksimal
+          const Text(
+            'Budget Maksimal per Orang (Rp)',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // TextFormField Manual
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.searchNavy,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.borderNavy),
+            ),
+            child: TextField(
+              controller: _budgetController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'Tulis nominal budget',
+                hintStyle: TextStyle(color: AppTheme.textMuted),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: InputBorder.none,
+              ),
+              onChanged: _onManualBudgetChanged,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Slider
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: AppTheme.orange,
+              inactiveTrackColor: AppTheme.borderNavy,
+              thumbColor: AppTheme.gold,
+              overlayColor: AppTheme.gold.withValues(alpha: 0.2),
+              trackHeight: 4,
+            ),
+            child: Slider(
+              value: _selectedBudget.toDouble().clamp(5000.0, 150000.0),
+              min: 5000,
+              max: 150000,
+              divisions: 29,
+              onChanged: (val) => _onBudgetSliderChanged(val.toInt()),
+            ),
+          ),
+
+          // Quick Chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _quickChips.map((chip) {
+              final val = chip['value'] as int;
+              final isSelected = val >= 150000
+                  ? _selectedBudget >= 150000
+                  : (_selectedBudget - val).abs() < 5000;
+
+              return GestureDetector(
+                onTap: () => _onBudgetSliderChanged(val),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: isSelected ? AppTheme.primaryGradient : null,
+                    color: isSelected ? null : AppTheme.surfaceNavy,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.transparent
+                          : AppTheme.borderNavy,
+                    ),
+                  ),
+                  child: Text(
+                    chip['label'] as String,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white70,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 22),
+
+          // Preferensi
+          const Text(
+            'Fasilitas & Suasana Favorit',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _allPreferences.map((pref) {
+              final isSelected = _selectedPreferences.contains(pref);
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedPreferences.remove(pref);
+                    } else {
+                      _selectedPreferences.add(pref);
+                    }
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: isSelected ? AppTheme.primaryGradient : null,
+                    color: isSelected ? null : AppTheme.surfaceNavy,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.transparent
+                          : AppTheme.borderNavy,
+                    ),
+                  ),
+                  child: Text(
+                    pref,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white70,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 32),
+
+          // Tombol Selesai & Masuk Beranda
+          Container(
+            width: double.infinity,
+            height: 52,
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.orange.withValues(alpha: 0.4),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _handleFinishOnboarding,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Simpan & Buka Beranda',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );

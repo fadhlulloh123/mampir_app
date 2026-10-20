@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../config/api_config.dart';
 import '../models/place_model.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 
 /// ============================================================
-/// ADD PLACE SCREEN — FORM TAMBAH TEMPAT (HTTP POST DEMO)
-/// ============================================================
-/// Layar form untuk mengusulkan tempat makan/nongkrong baru.
-///
-/// TUJUAN PRAKTIKUM / DEMO DOSEN:
-/// - Memperlihatkan validasi form input pengguna
-/// - Memperlihatkan pembuatan objek PlaceModel dari input form
-/// - Memperlihatkan pemanggilan HTTP POST ke REST API via ApiService
-/// - Memperlihatkan penanganan respons (status 201 Created atau gagal)
-/// - Menampilkan pesan ramah jika Web Service belum dikonfigurasi
+/// ADD PLACE SCREEN — TAMBAH TEMPAT BARU DENGAN PETA INTERAKTIF
 /// ============================================================
 class AddPlaceScreen extends StatefulWidget {
   const AddPlaceScreen({super.key});
@@ -23,47 +17,54 @@ class AddPlaceScreen extends StatefulWidget {
 }
 
 class _AddPlaceScreenState extends State<AddPlaceScreen> {
-  // Warna tema aplikasi MAMPIR (Material 3)
-  static const Color _primaryColor = Color(0xFFFF6B35); // Warm Orange
-  static const Color _secondaryColor = Color(0xFF004E64); // Deep Teal
-  static const Color _backgroundColor = Color(0xFFF8F9FA); // Soft Cream
-
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
 
-  // Controller input form
   final _nameController = TextEditingController();
-  final _categoryController = TextEditingController();
+  final _categoryController = TextEditingController(text: 'Cafe');
   final _addressController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _minPriceController = TextEditingController();
   final _maxPriceController = TextEditingController();
-  final _openHoursController = TextEditingController();
-  final _latController = TextEditingController();
-  final _lngController = TextEditingController();
-  final _imageUrlController = TextEditingController();
+  final _openHoursController = TextEditingController(text: '09.00 - 22.00 WIB');
+  final _latController = TextEditingController(text: '-7.4244');
+  final _lngController = TextEditingController(text: '109.2302');
+  final _imageUrlController = TextEditingController(
+      text:
+          'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80');
 
-  // Pilihan kota BARLINGMASCAKEB (tanpa 'Semua Wilayah' untuk form tambah)
   static const List<String> _cities = [
-    'Banyumas',
+    'Purwokerto / Banyumas',
     'Purbalingga',
     'Banjarnegara',
     'Cilacap',
     'Kebumen',
   ];
 
-  // Tag yang tersedia untuk dipilih
-  static const List<String> _availableTags = [
-    'Cafe & Ngopi',
-    'Makanan Berat',
-    'Murah Meriah',
-    'Wi-Fi & Colokan',
-    'Outdoor/Santai',
-    'Buka 24 Jam',
+  static const List<String> _categories = [
+    'Makan',
+    'Nongkrong',
+    'Cafe',
+    'Restoran',
+    'Warung',
   ];
 
-  String _selectedCity = 'Banyumas';
-  final Set<String> _selectedTags = {'Cafe & Ngopi'};
+  static const List<String> _availableFacilities = [
+    'WiFi',
+    'Colokan',
+    'AC',
+    'Parkir',
+    'Outdoor',
+    'Indoor',
+    'Mushola',
+    'Live Music',
+    'Ramah Hewan',
+    'Romantis',
+  ];
+
+  String _selectedCity = 'Purwokerto / Banyumas';
+  String _selectedCategory = 'Cafe';
+  final Set<String> _selectedFacilities = {'WiFi', 'Colokan'};
   bool _isSubmitting = false;
 
   @override
@@ -81,14 +82,149 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     super.dispose();
   }
 
-  /// Proses submit data form tempat baru
-  Future<void> _handleSubmit() async {
-    // 1. Validasi input form
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  /// Buka modal peta interaktif untuk memilih titik koordinat
+  void _pickLocationOnMap() {
+    double currentLat = double.tryParse(_latController.text) ?? -7.4244;
+    double currentLng = double.tryParse(_lngController.text) ?? 109.2302;
+    LatLng picked = LatLng(currentLat, currentLng);
 
-    // 2. Cek apakah Web Service sudah dikonfigurasi
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.scaffoldBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.8,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Sentuh Peta untuk Memilih Titik Lokasi',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Lat: ${picked.latitude.toStringAsFixed(5)}, Lng: ${picked.longitude.toStringAsFixed(5)}',
+                    style: const TextStyle(
+                      color: AppTheme.gold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: FlutterMap(
+                        options: MapOptions(
+                          initialCenter: picked,
+                          initialZoom: 14.0,
+                          onTap: (tapPos, point) {
+                            setModalState(() {
+                              picked = point;
+                            });
+                          },
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.mampir.mampir_app',
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: picked,
+                                width: 44,
+                                height: 44,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    gradient: AppTheme.primaryGradient,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black45,
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppTheme.borderNavy),
+                            foregroundColor: Colors.white70,
+                          ),
+                          child: const Text('Batal'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _latController.text =
+                                  picked.latitude.toStringAsFixed(5);
+                              _lngController.text =
+                                  picked.longitude.toStringAsFixed(5);
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Pilih Titik Ini'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) return;
+
     if (!ApiConfig.isConfigured) {
       _showNotConfiguredDialog();
       return;
@@ -98,40 +234,29 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
     try {
       final minPrice = int.tryParse(_minPriceController.text.trim()) ?? 0;
-      final maxPrice = int.tryParse(_maxPriceController.text.trim()) ?? 0;
-      final avgPrice = ((minPrice + maxPrice) / 2).round();
-
-      final lat = double.tryParse(_latController.text.trim()) ?? -7.45;
-      final lng = double.tryParse(_lngController.text.trim()) ?? 109.25;
-
-      final imageUrl = _imageUrlController.text.trim().isNotEmpty
-          ? _imageUrlController.text.trim()
-          : 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80';
+      final maxPrice = int.tryParse(_maxPriceController.text.trim()) ?? minPrice;
+      final lat = double.tryParse(_latController.text.trim()) ?? -7.4244;
+      final lng = double.tryParse(_lngController.text.trim()) ?? 109.2302;
 
       final newPlace = PlaceModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text.trim(),
         city: _selectedCity,
-        category: _categoryController.text.trim().isNotEmpty
-            ? _categoryController.text.trim()
-            : 'Cafe & Resto',
+        category: _selectedCategory,
         minPrice: minPrice,
         maxPrice: maxPrice,
-        avgPrice: avgPrice,
-        rating: 4.5,
-        tags: _selectedTags.toList(),
+        rating: 4.8,
+        reviewCount: 1,
+        facilities: _selectedFacilities.toList(),
         address: _addressController.text.trim(),
         description: _descriptionController.text.trim(),
-        openHours: _openHoursController.text.trim().isNotEmpty
-            ? _openHoursController.text.trim()
-            : '10.00 - 22.00 WIB',
+        openHours: _openHoursController.text.trim(),
         latitude: lat,
         longitude: lng,
-        imageUrl: imageUrl,
+        imageUrl: _imageUrlController.text.trim(),
         menuHighlights: [],
       );
 
-      // 3. Kirim ke REST API via HTTP POST
       final success = await _apiService.submitPlace(newPlace);
 
       if (!mounted) return;
@@ -139,55 +264,43 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Berhasil! Tempat baru telah dikirim ke Web Service.'),
-            backgroundColor: Color(0xFF2EC4B6),
+            content: Text('Tempat baru berhasil diusulkan!'),
+            backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Gagal mengirim data tempat ke server. Coba lagi.'),
+            content: Text('Gagal mengirim ke server. Coba lagi.'),
             backgroundColor: Colors.redAccent,
           ),
         );
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Terjadi kesalahan: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  /// Dialog edukatif jika Supabase belum dikonfigurasi
   void _showNotConfiguredDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.info_outline, color: _primaryColor),
-            SizedBox(width: 10),
-            Text('Web Service Belum Aktif', style: TextStyle(fontSize: 18)),
-          ],
-        ),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceNavy,
+        title: const Text('Web Service Belum Aktif',
+            style: TextStyle(color: Colors.white)),
         content: const Text(
-          'Fitur ini membutuhkan koneksi ke Web Service Supabase. '
-          'Silakan isi konfigurasi di api_config.dart untuk mengaktifkan pengiriman data via HTTP POST.\n\n'
-          'Untuk saat ini, aplikasi tetap berfungsi normal menampilkan 15 tempat rekomendasi bawaan.',
-          style: TextStyle(fontSize: 14, height: 1.4),
+          'Supabase REST API belum dikonfigurasi di lib/config/api_config.dart. Untuk demo lokal, data tersimpan di sesi.',
+          style: TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Mengerti', style: TextStyle(color: _primaryColor)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context, true);
+            },
+            child: const Text('Simpan Demo',
+                style: TextStyle(color: AppTheme.gold)),
           ),
         ],
       ),
@@ -197,313 +310,207 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: const Text(
-          'Usulkan Tempat Baru',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF2B2D42),
-        elevation: 0,
+        title: const Text('Usulkan Tempat Baru'),
+        backgroundColor: AppTheme.scaffoldBg,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Banner Info Web Service (HTTP POST)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: _secondaryColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _secondaryColor.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.cloud_upload_outlined,
-                        color: _secondaryColor, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Data yang kamu kirim akan diunggah via HTTP POST ke REST API Supabase.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _secondaryColor.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w500,
-                          height: 1.3,
-                        ),
-                      ),
+              _buildSectionTitle('Informasi Tempat'),
+              _buildTextField(
+                controller: _nameController,
+                label: 'Nama Tempat Makan / Cafe',
+                hint: 'Contoh: Cafe Senja Purwokerto',
+                validator: (v) => v!.isEmpty ? 'Nama wajib diisi' : null,
+              ),
+              const SizedBox(height: 14),
+
+              // Wilayah
+              _buildDropdown(
+                label: 'Wilayah Kabupaten',
+                value: _selectedCity,
+                items: _cities,
+                onChanged: (v) => setState(() => _selectedCity = v!),
+              ),
+              const SizedBox(height: 14),
+
+              // Kategori
+              _buildDropdown(
+                label: 'Kategori Tempat',
+                value: _selectedCategory,
+                items: _categories,
+                onChanged: (v) => setState(() => _selectedCategory = v!),
+              ),
+              const SizedBox(height: 14),
+
+              // Rentang Harga
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _minPriceController,
+                      label: 'Harga Minimal (Rp)',
+                      hint: '10000',
+                      keyboardType: TextInputType.number,
+                      validator: (v) =>
+                          v!.isEmpty ? 'Harga min wajib' : null,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _maxPriceController,
+                      label: 'Harga Maksimal (Rp)',
+                      hint: '35000',
+                      keyboardType: TextInputType.number,
+                      validator: (v) =>
+                          v!.isEmpty ? 'Harga max wajib' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              _buildTextField(
+                controller: _addressController,
+                label: 'Alamat Lengkap',
+                hint: 'Jl. HR Bunyamin No. 12',
+                validator: (v) => v!.isEmpty ? 'Alamat wajib' : null,
+              ),
+              const SizedBox(height: 14),
+
+              _buildTextField(
+                controller: _openHoursController,
+                label: 'Jam Operasional',
+                hint: '09.00 - 22.00 WIB',
+              ),
+              const SizedBox(height: 14),
+
+              _buildTextField(
+                controller: _descriptionController,
+                label: 'Deskripsi Singkat',
+                hint: 'Tempat ngopi santai harga mahasiswa...',
+                maxLines: 3,
               ),
               const SizedBox(height: 20),
 
-              // Bagian 1: Informasi Dasar
-              _buildSectionTitle('Informasi Dasar'),
-              _buildCard([
-                _buildTextField(
-                  controller: _nameController,
-                  label: 'Nama Tempat',
-                  hint: 'cth: Kopi Keprok, Mie Pak Slamet',
-                  icon: Icons.storefront_rounded,
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Nama tempat wajib diisi';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                // Dropdown Kota
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Kota / Kabupaten',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF495057),
-                      ),
+              // Fasilitas
+              _buildSectionTitle('Fasilitas & Suasana'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _availableFacilities.map((fac) {
+                  final isSelected = _selectedFacilities.contains(fac);
+                  return FilterChip(
+                    label: Text(fac),
+                    selected: isSelected,
+                    selectedColor: AppTheme.orange.withValues(alpha: 0.3),
+                    checkmarkColor: AppTheme.gold,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
                     ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: _backgroundColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedCity,
-                          isExpanded: true,
-                          icon: const Icon(Icons.arrow_drop_down,
-                              color: _primaryColor),
-                          items: _cities.map((city) {
-                            return DropdownMenuItem(
-                              value: city,
-                              child: Text(
-                                city,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedCity = val);
-                            }
-                          },
-                        ),
-                      ),
+                    backgroundColor: AppTheme.surfaceNavy,
+                    side: BorderSide(
+                      color: isSelected ? AppTheme.gold : AppTheme.borderNavy,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _categoryController,
-                  label: 'Kategori',
-                  hint: 'cth: Cafe & Resto, Warung Makan, Warmindo',
-                  icon: Icons.category_outlined,
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _addressController,
-                  label: 'Alamat Lengkap',
-                  hint: 'Jl. Raya Baturraden, Purwokerto...',
-                  icon: Icons.place_outlined,
-                  maxLines: 2,
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Alamat wajib diisi';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _openHoursController,
-                  label: 'Jam Buka',
-                  hint: 'cth: 09.00 - 23.00 WIB atau Buka 24 Jam',
-                  icon: Icons.access_time_rounded,
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _descriptionController,
-                  label: 'Deskripsi Tempat',
-                  hint: 'Ceritakan suasana atau keunikan tempat ini...',
-                  icon: Icons.description_outlined,
-                  maxLines: 3,
-                ),
-              ]),
-              const SizedBox(height: 20),
+                    onSelected: (val) {
+                      setState(() {
+                        if (val) {
+                          _selectedFacilities.add(fac);
+                        } else {
+                          _selectedFacilities.remove(fac);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
 
-              // Bagian 2: Estimasi Harga
-              _buildSectionTitle('Estimasi Harga (per Orang)'),
-              _buildCard([
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _minPriceController,
-                        label: 'Harga Minimal',
-                        hint: '10000',
-                        prefixText: 'Rp ',
-                        icon: Icons.arrow_downward_rounded,
-                        keyboardType: TextInputType.number,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Wajib diisi';
-                          }
-                          if (int.tryParse(val.trim()) == null) {
-                            return 'Angka tidak valid';
-                          }
-                          return null;
-                        },
-                      ),
+              // Titik Koordinat & Peta
+              _buildSectionTitle('Titik Koordinat Peta'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _latController,
+                      label: 'Latitude',
+                      hint: '-7.4244',
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _maxPriceController,
-                        label: 'Harga Maksimal',
-                        hint: '35000',
-                        prefixText: 'Rp ',
-                        icon: Icons.arrow_upward_rounded,
-                        keyboardType: TextInputType.number,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Wajib diisi';
-                          }
-                          final max = int.tryParse(val.trim());
-                          if (max == null) return 'Angka tidak valid';
-                          final min = int.tryParse(_minPriceController.text.trim()) ?? 0;
-                          if (max < min) return 'Harus >= Min';
-                          return null;
-                        },
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _lngController,
+                      label: 'Longitude',
+                      hint: '109.2302',
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: _pickLocationOnMap,
+                icon: const Icon(Icons.map_rounded, color: Colors.white),
+                label: const Text(
+                  'Pilih Titik Langsung dari Peta Interaktif',
+                  style: TextStyle(color: Colors.white),
                 ),
-              ]),
-              const SizedBox(height: 20),
-
-              // Bagian 3: Tag / Fasilitas
-              _buildSectionTitle('Pilih Tag & Suasana'),
-              _buildCard([
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _availableTags.map((tag) {
-                    final isSelected = _selectedTags.contains(tag);
-                    return FilterChip(
-                      label: Text(tag),
-                      selected: isSelected,
-                      selectedColor: _primaryColor,
-                      backgroundColor: _backgroundColor,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.white : const Color(0xFF2B2D42),
-                      ),
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedTags.add(tag);
-                          } else {
-                            _selectedTags.remove(tag);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.surfaceNavy,
+                  side: const BorderSide(color: AppTheme.orange),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ]),
-              const SizedBox(height: 20),
-
-              // Bagian 4: Koordinat & Gambar (Opsional)
-              _buildSectionTitle('Lokasi Peta & Gambar (Opsional)'),
-              _buildCard([
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _latController,
-                        label: 'Latitude',
-                        hint: '-7.4215',
-                        icon: Icons.map_outlined,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true, signed: true),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _lngController,
-                        label: 'Longitude',
-                        hint: '109.2380',
-                        icon: Icons.map_outlined,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true, signed: true),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                _buildTextField(
-                  controller: _imageUrlController,
-                  label: 'URL Gambar',
-                  hint: 'https://...',
-                  icon: Icons.image_outlined,
-                ),
-              ]),
-              const SizedBox(height: 30),
+              ),
+              const SizedBox(height: 32),
 
               // Tombol Submit
-              SizedBox(
+              Container(
+                width: double.infinity,
                 height: 52,
-                child: ElevatedButton.icon(
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.orange.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _handleSubmit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryColor,
-                    foregroundColor: Colors.white,
-                    elevation: 3,
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(26),
                     ),
                   ),
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                  child: _isSubmitting
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Kirim Usulan Tempat',
+                          style: TextStyle(
                             color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
                           ),
-                        )
-                      : const Icon(Icons.send_rounded, size: 20),
-                  label: Text(
-                    _isSubmitting ? 'Mengirim Data...' : 'Kirim Usulan Tempat',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                        ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
             ],
           ),
         ),
@@ -513,35 +520,14 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
         style: const TextStyle(
-          fontSize: 14,
+          color: AppTheme.gold,
+          fontSize: 16,
           fontWeight: FontWeight.w800,
-          color: Color(0xFF2B2D42),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCard(List<Widget> children) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
       ),
     );
   }
@@ -550,48 +536,62 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     required TextEditingController controller,
     required String label,
     required String hint,
-    required IconData icon,
-    int maxLines = 1,
-    String? prefixText,
     TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
     String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white),
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppTheme.textSecondary),
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppTheme.textMuted),
+        fillColor: AppTheme.surfaceNavy,
+        filled: true,
+      ),
+    );
+  }
+
+  Widget _buildDropdown({
+    required String label,
+    required String value,
+    required List<String> items,
+    required Function(String?) onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF495057),
-          ),
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          validator: validator,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixText: prefixText,
-            prefixIcon: Icon(icon, size: 20, color: _primaryColor),
-            filled: true,
-            fillColor: _backgroundColor,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _primaryColor, width: 1.5),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceNavy,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.borderNavy),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: AppTheme.surfaceNavy,
+              icon: const Icon(Icons.arrow_drop_down, color: AppTheme.gold),
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              items: items.map((item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item),
+                );
+              }).toList(),
+              onChanged: onChanged,
             ),
           ),
         ),
