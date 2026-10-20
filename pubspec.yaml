@@ -1,0 +1,44 @@
+name: mampir_app
+description: "MAMPIR - Makan, Ampir, Pilih, dan Rekomendasi Tempat Makan & Nongkrong se-BARLINGMASCAKEB"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # ============================================================
+  # PACKAGE WAJIB UNTUK MAMPIR APP
+  # ============================================================
+
+  # Package HTTP untuk memanggil REST API (Web Service)
+  # Digunakan di lib/services/api_service.dart untuk HTTP GET & POST
+  http: ^1.4.0
+
+  # Package Peta OpenStreetMap (GRATIS, tanpa API Key berbayar)
+  # Digunakan di home_screen.dart tab Peta
+  flutter_map: ^7.0.2
+
+  # Package koordinat latitude/longitude untuk flutter_map
+  latlong2: ^0.9.1
+
+  # Package penyimpanan lokal (budget, selera, favorit)
+  # Digunakan di lib/services/preference_service.dart
+  shared_preferences: ^2.3.5
+
+  # Package untuk membuka Google Maps dari aplikasi
+  # Digunakan di place_detail_screen.dart tombol "Buka Rute"
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
