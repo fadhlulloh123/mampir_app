@@ -9,7 +9,7 @@ import 'home_screen.dart';
 /// ONBOARDING & WELCOME SCREEN — SESUAI SplashS contoh.jpeg
 /// ============================================================
 /// Step 1: Layar Selamat Datang (MAMPIR, Subjudul Emas, Ilustrasi, Tombol "Mulai")
-/// Step 2: Atur Budget, Wilayah BARLINGMASCAKEB, dan Preferensi
+/// Step 2: Atur Budget, Wilayah Purwokerto & Sekitarnya, dan Preferensi
 /// Setelah selesai -> is_first_launch = false -> Masuk HomeScreen
 /// ============================================================
 class OnboardingPreferenceScreen extends StatefulWidget {
@@ -28,7 +28,7 @@ class _OnboardingPreferenceScreenState
   bool _isLoading = false;
 
   // Preferensi pengguna
-  String _selectedRegion = 'Purwokerto / Banyumas';
+  String _selectedRegion = 'Purwokerto Kota';
   int _selectedBudget = 25000;
   final Set<String> _selectedPreferences = {'WiFi', 'Colokan', 'Nongkrong'};
 
@@ -37,11 +37,13 @@ class _OnboardingPreferenceScreenState
       NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
   static const List<String> _regions = [
-    'Purwokerto / Banyumas',
-    'Purbalingga',
-    'Banjarnegara',
-    'Cilacap',
-    'Kebumen',
+    'Semua Wilayah',
+    'Purwokerto Kota',
+    'Baturraden',
+    'Purwokerto Utara (Unsoed)',
+    'Sokaraja',
+    'Purwokerto Timur & Sumbang',
+    'Purwokerto Barat & Selatan',
   ];
 
   static const List<Map<String, dynamic>> _quickChips = [
@@ -276,7 +278,7 @@ class _OnboardingPreferenceScreenState
                   children: [
                     _buildFeatureMiniCard(Icons.local_cafe_rounded, 'Cafe & Resto'),
                     _buildFeatureMiniCard(Icons.payments_rounded, 'Pas Budget'),
-                    _buildFeatureMiniCard(Icons.map_rounded, 'Se-BARLINGMASCAKEB'),
+                    _buildFeatureMiniCard(Icons.map_rounded, 'Purwokerto & Sekitarnya'),
                   ],
                 ),
               ],

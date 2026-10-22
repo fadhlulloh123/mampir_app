@@ -42,8 +42,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
       'isMascot': false,
     },
     {
-      'title': 'Kuliner Baru di BARLINGMASCAKEB',
-      'subtitle': 'Kopi Bitingan Dieng kini tersedia di MAMPIR',
+      'title': 'Kuliner Baru di Baturraden',
+      'subtitle': 'Kopi Keprok & Massapi Baturraden kini tersedia di MAMPIR',
       'time': '3 hari yang lalu',
       'unread': false,
       'image':

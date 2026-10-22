@@ -108,7 +108,7 @@ class SettingsScreen extends StatelessWidget {
                               title: const Text('Bantuan & Kontak',
                                   style: TextStyle(color: Colors.white)),
                               content: const Text(
-                                'Aplikasi MAMPIR — Khas Ngapak Se-BARLINGMASCAKEB\nHubungi: support@mampir.id',
+                                'Aplikasi MAMPIR — Kuliner & Nongkrong Purwokerto & Sekitarnya (Baturraden, Sokaraja)\nHubungi: support@mampir.id',
                                 style: TextStyle(color: AppTheme.textSecondary),
                               ),
                               actions: [
@@ -133,7 +133,7 @@ class SettingsScreen extends StatelessWidget {
                             applicationName: 'MAMPIR',
                             applicationVersion: '1.0.0',
                             applicationLegalese:
-                                '© 2026 MAMPIR. Khas Ngapak se-BARLINGMASCAKEB.',
+                                '© 2026 MAMPIR. Kuliner & Nongkrong Khas Purwokerto & Sekitarnya.',
                           );
                         },
                       ),

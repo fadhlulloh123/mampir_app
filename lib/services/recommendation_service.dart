@@ -245,16 +245,18 @@ class RecommendationService {
   /// Helper untuk memetakan nama wilayah ke kata kunci pencarian
   static List<String> _getRegionKeywords(String region) {
     final r = region.toLowerCase();
-    if (r.contains('purwokerto') || r.contains('banyumas')) {
-      return ['purwokerto', 'banyumas', 'sokaraja', 'baturraden'];
-    } else if (r.contains('purbalingga')) {
-      return ['purbalingga', 'kalimanah', 'bobotsari'];
-    } else if (r.contains('banjarnegara')) {
-      return ['banjarnegara', 'dieng', 'wanayasa'];
-    } else if (r.contains('cilacap')) {
-      return ['cilacap', 'kroya', 'teluk penyu', 'majenang'];
-    } else if (r.contains('kebumen')) {
-      return ['kebumen', 'gombong', 'ambal'];
+    if (r.contains('baturraden')) {
+      return ['baturraden', 'karanggintung', 'rempoah', 'ketenger', 'palawi', 'curug', 'limpakuwus'];
+    } else if (r.contains('unsoed') || r.contains('utara')) {
+      return ['unsoed', 'bunyamin', 'grendeng', 'purwokerto utara', 'pabuaran', 'karangwangkal'];
+    } else if (r.contains('sokaraja')) {
+      return ['sokaraja', 'soto sokaraja', 'getuk'];
+    } else if (r.contains('sumbang') || r.contains('timur') || r.contains('kembaran')) {
+      return ['sumbang', 'kembaran', 'arcawinangun', 'dukuhwaluh', 'ump', 'ledug', 'purwokerto timur'];
+    } else if (r.contains('barat') || r.contains('selatan') || r.contains('stasiun')) {
+      return ['purwokerto barat', 'purwokerto selatan', 'stasiun', 'kober', 'gerilya', 'andhang', 'tanjung'];
+    } else if (r.contains('purwokerto kota') || r.contains('kota') || r.contains('pusat')) {
+      return ['purwokerto kota', 'alun-alun', 'gor', 'sudirman', 'dr. angka', 'isdiman', 'sukun', 'pramuka'];
     }
     return [r];
   }

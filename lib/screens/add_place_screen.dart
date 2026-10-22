@@ -34,11 +34,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80');
 
   static const List<String> _cities = [
-    'Purwokerto / Banyumas',
-    'Purbalingga',
-    'Banjarnegara',
-    'Cilacap',
-    'Kebumen',
+    'Purwokerto Kota',
+    'Baturraden',
+    'Purwokerto Utara (Unsoed)',
+    'Sokaraja',
+    'Purwokerto Timur & Sumbang',
+    'Purwokerto Barat & Selatan',
   ];
 
   static const List<String> _categories = [
@@ -62,7 +63,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     'Romantis',
   ];
 
-  String _selectedCity = 'Purwokerto / Banyumas';
+  String _selectedCity = 'Purwokerto Kota';
   String _selectedCategory = 'Cafe';
   final Set<String> _selectedFacilities = {'WiFi', 'Colokan'};
   bool _isSubmitting = false;

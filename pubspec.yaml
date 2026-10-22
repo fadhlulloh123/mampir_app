@@ -1,10 +1,10 @@
 name: mampir_app
-description: "MAMPIR - Makan, Ampir, Pilih, dan Rekomendasi Tempat Makan & Nongkrong se-BARLINGMASCAKEB"
+description: "MAMPIR - Makan, Ampir, Pilih, dan Rekomendasi Tempat Makan & Nongkrong di Purwokerto dan Sekitarnya (Baturraden, Sokaraja)"
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.12.2
+  sdk: ^3.11.0
 
 dependencies:
   flutter:

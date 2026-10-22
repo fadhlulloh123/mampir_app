@@ -5,7 +5,8 @@ import 'dart:math' as math;
 /// MODEL DATA TEMPAT MAKAN & NONGKRONG — MAMPIR APP
 /// ============================================================
 /// Class ini merepresentasikan satu entitas tempat makan/nongkrong
-/// se-BARLINGMASCAKEB dengan dukungan fasilitas, rating, ulasan,
+/// di wilayah Kota Purwokerto dan sekitarnya (Baturraden, Sokaraja,
+/// Sumbang, Unsoed, dll.) dengan dukungan fasilitas, rating, ulasan,
 /// harga, koordinat, dan menu andalan.
 /// ============================================================
 

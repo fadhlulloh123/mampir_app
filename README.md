@@ -1,6 +1,6 @@
 # MAMPIR App
 
-**MAMPIR** (Makan, Ampir, Pilih, dan Rekomendasi) adalah aplikasi Flutter untuk membantu pengguna menemukan tempat makan dan nongkrong di wilayah **BARLINGMASCAKEB** (Banjarnegara, Purbalingga, Banyumas, Cilacap, Kebumen).
+**MAMPIR** (Makan, Ampir, Pilih, dan Rekomendasi) adalah aplikasi Flutter untuk membantu pengguna menemukan tempat makan dan nongkrong terbaik di **Kota Purwokerto dan sekitarnya** (Baturraden, Sokaraja, Sumbang, Unsoed, dll.).
 
 Aplikasi ini berfokus pada rekomendasi tempat berdasarkan:
 - budget pengguna,

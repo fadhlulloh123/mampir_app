@@ -18,7 +18,7 @@ import 'settings_screen.dart';
 /// HOME SCREEN — SESUAI beranda.jpeg & SPESIFIKASI #8
 /// ============================================================
 /// Fitur Lengkap:
-/// - Header: Pin Oranye + Dropdown BARLINGMASCAKEB + Lonceng Notifikasi + Pengaturan
+/// - Header: Pin Oranye + Dropdown Purwokerto & Sekitarnya + Lonceng Notifikasi + Pengaturan
 /// - Search Bar + Filter Modal
 /// - 5 Tombol Kategori Bulat Gradasi: Makan, Nongkrong, Cafe, Restoran, Lainnya
 /// - Rekomendasi untuk kamu (Featured Card & Carousel Cerdas)
@@ -43,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
 
   // Filter State
-  String _selectedRegion = 'Purwokerto / Banyumas';
+  String _selectedRegion = 'Purwokerto Kota';
   int _userBudget = 25000;
   Set<String> _userPreferences = {'WiFi', 'Colokan'};
   Set<String> _favoriteIds = {};
@@ -55,12 +55,14 @@ class _HomeScreenState extends State<HomeScreen> {
   // Favorit tab category filter
   String _selectedFavCategory = 'Semua';
 
-  static const List<String> _barlingmascakebRegions = [
-    'Purwokerto / Banyumas',
-    'Purbalingga',
-    'Banjarnegara',
-    'Cilacap',
-    'Kebumen',
+  static const List<String> _purwokertoRegions = [
+    'Semua Wilayah',
+    'Purwokerto Kota',
+    'Baturraden',
+    'Purwokerto Utara (Unsoed)',
+    'Sokaraja',
+    'Purwokerto Timur & Sumbang',
+    'Purwokerto Barat & Selatan',
   ];
 
   @override
@@ -228,15 +230,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     // Tempat Populer di wilayah terpilih
-    final popularPlaces = _allPlaces.where((p) {
-      if (_selectedRegion.isNotEmpty) {
-        final reg = _selectedRegion.split('/')[0].trim().toLowerCase();
-        if (!p.city.toLowerCase().contains(reg)) {
+    List<PlaceModel> popularPlaces = _allPlaces.where((p) {
+      if (_selectedRegion.isNotEmpty &&
+          !_selectedRegion.toLowerCase().contains('semua')) {
+        final regClean = _selectedRegion.split('(')[0].trim().toLowerCase();
+        final pCity = p.city.toLowerCase();
+        final pAddr = p.address.toLowerCase();
+        if (!pCity.contains(regClean) && !pAddr.contains(regClean)) {
           return false;
         }
       }
       return true;
     }).toList();
+    if (popularPlaces.isEmpty) {
+      popularPlaces = List.from(_allPlaces);
+    }
     popularPlaces.sort((a, b) => b.reviewCount.compareTo(a.reviewCount));
 
     final featured = recommendations.isNotEmpty
@@ -268,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const SizedBox(height: 10),
 
-                  // 1. Header: Pin Oranye + Dropdown BARLINGMASCAKEB + Lonceng
+                  // 1. Header: Pin Oranye + Dropdown Purwokerto & Sekitarnya + Lonceng
                   _buildTopHeader(),
                   const SizedBox(height: 18),
 
@@ -330,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
-              items: _barlingmascakebRegions.map((region) {
+              items: _purwokertoRegions.map((region) {
                 return DropdownMenuItem<String>(
                   value: region,
                   child: Text(
@@ -1179,8 +1187,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         FlutterMap(
           options: const MapOptions(
-            initialCenter: LatLng(-7.4244, 109.2302), // Purwokerto BARLINGMASCAKEB
-            initialZoom: 11.5,
+            initialCenter: LatLng(-7.3850, 109.2380), // Poros Purwokerto - Baturraden
+            initialZoom: 12.0,
           ),
           children: [
             TileLayer(
@@ -1251,7 +1259,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Menampilkan ${_allPlaces.length} tempat di BARLINGMASCAKEB',
+                    'Menampilkan ${_allPlaces.length} tempat di Purwokerto & Sekitarnya',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

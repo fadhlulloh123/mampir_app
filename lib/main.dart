@@ -9,7 +9,7 @@ import 'theme/app_theme.dart';
 /// MAIN.DART — ENTRY POINT APLIKASI MAMPIR
 /// ============================================================
 /// MAMPIR: Makan, Ampir, Pilih, dan Rekomendasi
-/// Khas Ngapak • Se-BARLINGMASCAKEB
+/// Kuliner & Nongkrong • Kota Purwokerto & Sekitarnya (Baturraden, Sokaraja)
 /// ============================================================
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

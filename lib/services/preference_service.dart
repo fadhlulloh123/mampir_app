@@ -71,19 +71,19 @@ class PreferenceService {
 
   // ======================== SELECTED REGION ========================
 
-  /// Simpan wilayah terpilih se-BARLINGMASCAKEB.
+  /// Simpan wilayah terpilih di Purwokerto dan sekitarnya.
   Future<void> saveSelectedRegion(String region) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(keyRegion, region);
     await prefs.setString(_legacyKeyCity, region);
   }
 
-  /// Ambil wilayah terpilih. Default: "Purwokerto / Banyumas".
+  /// Ambil wilayah terpilih. Default: "Purwokerto Kota".
   Future<String> getSelectedRegion() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(keyRegion) ??
         prefs.getString(_legacyKeyCity) ??
-        'Purwokerto / Banyumas';
+        'Purwokerto Kota';
   }
 
   /// Alias kompatibilitas kota
