@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -44,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Data State
   List<PlaceModel> _allPlaces = [];
   bool _isLoading = true;
+  Uint8List? _userPhotoBytes;
 
   // Filter State
   String _selectedRegion = 'Purwokerto Kota';
@@ -182,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final budget = await _prefService.getBudget();
     final prefs = await _prefService.getUserPreferences();
     final favs = await _prefService.getFavorites();
+    final photoBytes = await _prefService.getUserPhotoBytes();
 
     final places = await _apiService.fetchPlaces();
 
@@ -195,6 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _userBudget = budget;
         if (prefs.isNotEmpty) _userPreferences = prefs.toSet();
         _favoriteIds = favs.toSet();
+        _userPhotoBytes = photoBytes;
         _allPlaces = places;
         _isLoading = false;
       });
@@ -589,19 +593,44 @@ class _HomeScreenState extends State<HomeScreen> {
         IconButton(
           padding: const EdgeInsets.all(6),
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          icon: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppTheme.orange.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.orange.withValues(alpha: 0.5)),
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: AppTheme.orange,
-              size: 20,
-            ),
-          ),
+          icon: _userPhotoBytes != null
+              ? Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.orange, width: 1.5),
+                  ),
+                  child: ClipOval(
+                    child: Image.memory(
+                      _userPhotoBytes!,
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (ctx, err, st) => const Icon(
+                        Icons.person_rounded,
+                        color: AppTheme.orange,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.orange.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppTheme.orange.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: AppTheme.orange,
+                    size: 20,
+                  ),
+                ),
           tooltip: 'Profil Pengguna',
           onPressed: () {
             Navigator.push(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -17,8 +18,10 @@ import 'package:mampir_app/services/auth_service.dart';
 import 'package:mampir_app/services/google_places_service.dart';
 import 'package:mampir_app/services/google_routes_service.dart';
 import 'package:mampir_app/services/preference_service.dart';
+import 'package:mampir_app/services/profile_photo_service.dart';
 import 'package:mampir_app/services/recommendation_service.dart';
 import 'package:mampir_app/widgets/budget_filter_modal.dart';
+import 'package:mampir_app/widgets/profile_photo_editor_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -696,4 +699,170 @@ void main() {
     );
     expect(webUrl, contains('redirect_to=https%3A%2F%2Fmampir.id'));
   });
+
+  test('PreferenceService saves, updates, deletes, and clears profile photo', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefService = PreferenceService();
+
+    // Awalnya kosong
+    expect(await prefService.getUserPhotoBytes(), isNull);
+
+    // Tambah foto
+    final initialBytes = Uint8List.fromList([137, 80, 78, 71, 1, 2, 3]);
+    await prefService.saveUserPhotoBytes(initialBytes);
+    expect(await prefService.getUserPhotoBytes(), equals(initialBytes));
+
+    // Ubah foto
+    final updatedBytes = Uint8List.fromList([137, 80, 78, 71, 9, 8, 7]);
+    await prefService.saveUserPhotoBytes(updatedBytes);
+    expect(await prefService.getUserPhotoBytes(), equals(updatedBytes));
+
+    // Hapus foto
+    await prefService.deleteUserPhoto();
+    expect(await prefService.getUserPhotoBytes(), isNull);
+
+    // Logout ikut membersihkan foto lokal
+    await prefService.saveUserPhotoBytes(initialBytes);
+    expect(await prefService.getUserPhotoBytes(), isNotNull);
+    await prefService.logout();
+    expect(await prefService.getUserPhotoBytes(), isNull);
+  });
+
+  test('ProfilePhotoService handles local import, cancel, empty, and oversized files', () async {
+    // 1. Batal memilih file
+    final cancelledService = ProfilePhotoService(picker: () async => null);
+    final cancelRes = await cancelledService.pickFromLocalFolder();
+    expect(cancelRes.cancelled, isTrue);
+    expect(cancelRes.hasImage, isFalse);
+
+    // 2. File kosong
+    final emptyService = ProfilePhotoService(
+      picker: () async => LocalPickedImage(
+        name: 'kosong.png',
+        sizeBytes: 0,
+        readBytes: () async => Uint8List(0),
+      ),
+    );
+    final emptyRes = await emptyService.pickFromLocalFolder();
+    expect(emptyRes.hasImage, isFalse);
+    expect(emptyRes.errorMessage, isNotNull);
+
+    // 3. File melebihi batas 15 MB
+    final hugeService = ProfilePhotoService(
+      picker: () async => LocalPickedImage(
+        name: 'besar.png',
+        sizeBytes: ProfilePhotoService.maxFileSizeBytes + 1,
+        readBytes: () async => Uint8List(10),
+      ),
+    );
+    final hugeRes = await hugeService.pickFromLocalFolder();
+    expect(hugeRes.hasImage, isFalse);
+    expect(hugeRes.errorMessage, contains('15 MB'));
+
+    // 4. File valid
+    final sampleBytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    );
+    final validService = ProfilePhotoService(
+      picker: () async => LocalPickedImage(
+        name: 'avatar.png',
+        sizeBytes: sampleBytes.length,
+        readBytes: () async => sampleBytes,
+      ),
+    );
+    final validRes = await validService.pickFromLocalFolder();
+    expect(validRes.hasImage, isTrue);
+    expect(validRes.fileName, equals('avatar.png'));
+    expect(validRes.bytes, equals(sampleBytes));
+  });
+
+  testWidgets(
+    'SettingsScreen allows adding, editing, changing, and deleting profile photo from local folder',
+    (WidgetTester tester) async {
+      final samplePng = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      );
+      SharedPreferences.setMockInitialValues({
+        'user_name': 'Siti Kuliner',
+        'user_email': 'siti@mampir.id',
+      });
+
+      final mockPhotoService = ProfilePhotoService(
+        picker: () async => LocalPickedImage(
+          name: 'profil_lokal.png',
+          sizeBytes: samplePng.length,
+          readBytes: () async => samplePng,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SettingsScreen(
+            isRootTab: false,
+            photoService: mockPhotoService,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Awalnya belum ada foto: tampil inisial 'S'
+      expect(find.text('S'), findsOneWidget);
+
+      // Buka menu kelola foto profil
+      await tester.tap(find.byTooltip('Kelola Foto Profil').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tambah Foto dari Folder Lokal'), findsOneWidget);
+      expect(find.text('Hapus Foto Profil'), findsNothing);
+
+      // Pilih Tambah Foto -> membuka ProfilePhotoEditorDialog
+      await tester.tap(find.text('Tambah Foto dari Folder Lokal'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfilePhotoEditorDialog), findsOneWidget);
+      expect(find.text('Putar Kanan'), findsOneWidget);
+      expect(find.text('Balik'), findsOneWidget);
+      expect(find.text('Hangat'), findsOneWidget);
+
+      // Uji kontrol edit (Putar, Balik, Filter)
+      await tester.tap(find.text('Putar Kanan'));
+      await tester.pump();
+      await tester.tap(find.text('Balik'));
+      await tester.pump();
+      await tester.tap(find.text('Hangat'));
+      await tester.pump();
+
+      // Simpan foto hasil edit via runAsync agar render rasterisasi toImage selesai
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Simpan Foto'));
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      });
+      await tester.pumpAndSettle();
+
+      // Pastikan foto tersimpan di PreferenceService
+      final savedBytes = await PreferenceService().getUserPhotoBytes();
+      expect(savedBytes, isNotNull);
+      expect(savedBytes!.isNotEmpty, isTrue);
+
+      // Buka lagi menu kelola foto: kini tampil Ubah, Edit Saat Ini, dan Hapus
+      await tester.tap(find.byTooltip('Kelola Foto Profil').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ubah Foto dari Folder Lokal'), findsOneWidget);
+      expect(find.text('Edit Foto Saat Ini'), findsOneWidget);
+      expect(find.text('Hapus Foto Profil'), findsOneWidget);
+
+      // Pilih Hapus Foto Profil -> konfirmasi Hapus
+      await tester.tap(find.text('Hapus Foto Profil'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hapus Foto Profil'), findsAtLeastNWidgets(1));
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Hapus'));
+      await tester.pumpAndSettle();
+
+      // Foto terhapus & avatar kembali ke inisial 'S'
+      expect(await PreferenceService().getUserPhotoBytes(), isNull);
+      expect(find.text('S'), findsOneWidget);
+    },
+  );
 }
