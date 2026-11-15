@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
   <!-- MAMPIR Web Custom Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=1.6" />
+  <link rel="stylesheet" href="css/style.css?v=2.4" />
 </head>
 <body>
 
@@ -38,6 +38,10 @@
           <span class="icon">🏠</span>
           <span data-i18n="nav_home">Beranda</span>
         </a>
+        <a class="nav-item" data-view="terdekat">
+          <span class="icon">📍</span>
+          <span data-i18n="nav_near_me">Terdekat (Near Me)</span>
+        </a>
         <a class="nav-item" data-view="cari">
           <span class="icon">🔍</span>
           <span data-i18n="nav_search">Cari Tempat</span>
@@ -53,10 +57,6 @@
         <a class="nav-item" id="nav-roulette-btn" onclick="window.Roulette.openModal()">
           <span class="icon">🎲</span>
           <span data-i18n="nav_roulette">Putar Roda Pilihan</span>
-        </a>
-        <a class="nav-item" data-view="admin">
-          <span class="icon">🛡️</span>
-          <span data-i18n="nav_admin">Admin & Mitra</span>
         </a>
         <a class="nav-item" data-view="pengaturan">
           <span class="icon">⚙️</span>
@@ -93,6 +93,13 @@
               <option value="Purwokerto Barat & Selatan" data-i18n="region_pwt_barat">Purwokerto Barat & Selatan</option>
             </select>
           </div>
+
+          <!-- GPS Live Detector Button & Status -->
+          <button class="btn-gps-detect" id="btn-gps-detect" onclick="window.App.triggerGpsDetection(true)" data-i18n-title="gps_detect_btn_title" title="Deteksi Tempat Makan di Sekitar GPS Anda (Google Maps)">
+            <span class="gps-pulse-indicator" id="gps-status-dot"></span>
+            <span class="gps-icon-live">🛰️</span>
+            <span id="gps-status-label" data-i18n="gps_status_btn">GPS Purwokerto</span>
+          </button>
         </div>
 
         <div class="header-center">
@@ -172,6 +179,9 @@
         <section class="map-column" id="map-column-area">
           <div id="live-map-container"></div>
           <div class="map-floating-controls">
+            <button class="btn-map-control btn-map-gps" onclick="window.App.triggerGpsDetection(true)" data-i18n="map_btn_gps" title="Pusatkan peta ke lokasi GPS Anda & deteksi tempat makan">
+              🎯 Lokasi GPS Saya
+            </button>
             <button class="btn-map-control" onclick="window.App.focusMap('pwt-center', -7.4243, 109.2303)" data-i18n="map_btn_center">
               📍 Pusat Alun-Alun
             </button>
@@ -386,55 +396,6 @@
     </div>
   </div>
 
-  <!-- Modal Tambah Agenda & Event Kafe (Mitra Dashboard) -->
-  <div class="modal-backdrop" id="modal-create-event">
-    <div class="modal-card" style="max-width: 480px;">
-      <div class="modal-header">
-        <h3 id="modal-event-title" data-i18n="modal_event_title">🎉 Tambah Agenda & Pengumuman Kafe</h3>
-        <button class="modal-close-btn" onclick="window.App.closeModal('modal-create-event')">✕</button>
-      </div>
-      <div class="modal-body">
-        <form id="form-create-event" onsubmit="event.preventDefault(); window.App.saveNewEvent();">
-          <div class="form-group">
-            <label data-i18n="event_select_cafe">Pilih Kafe Anda:</label>
-            <select id="event-input-cafe-id" class="form-control" required>
-              <!-- Diisi oleh app.js -->
-            </select>
-          </div>
-          <div class="form-group">
-            <label data-i18n="event_title_label">Judul Agenda / Promo:</label>
-            <input type="text" id="event-input-title" class="form-control" data-i18n-placeholder="event_title_ph" placeholder="Contoh: Live Acoustic Malam Minggu & Diskon 20%" required />
-          </div>
-          <div class="form-group">
-            <label data-i18n="event_cat_label">Kategori Acara:</label>
-            <select id="event-input-category" class="form-control">
-              <option value="Live Music" data-i18n="event_cat_music">🎵 Live Music / Konser Akustik</option>
-              <option value="Promo Spesial" data-i18n="event_cat_promo">🏷️ Promo Spesial / Diskon</option>
-              <option value="Workshop" data-i18n="event_cat_workshop">☕ Workshop / Edukasi Kopi</option>
-              <option value="Nonton Bareng" data-i18n="event_cat_nobar">⚽ Nonton Bareng (Nobar)</option>
-              <option value="Lainnya" data-i18n="event_cat_other">✨ Acara Lainnya</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label data-i18n="event_schedule_label">Jadwal / Waktu Pelaksanaan:</label>
-            <input type="text" id="event-input-date" class="form-control" data-i18n-placeholder="event_schedule_ph" placeholder="Contoh: Sabtu, 19.30 - 22.00 WIB" required />
-          </div>
-          <div class="form-group">
-            <label data-i18n="event_desc_label">Deskripsi Acara & Ketentuan:</label>
-            <textarea id="event-input-desc" class="form-control" rows="3" data-i18n-placeholder="event_desc_ph" placeholder="Jelaskan detail acara, syarat promo, dll..." required></textarea>
-          </div>
-          <div class="form-group">
-            <label data-i18n="event_badge_label">Label Badge Singkat:</label>
-            <input type="text" id="event-input-badge" class="form-control" data-i18n-placeholder="event_badge_ph" placeholder="Contoh: Promo Spesial / Free Entry" />
-          </div>
-          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 14px; padding: 11px;" data-i18n="event_btn_publish">
-            Publikasikan Agenda Kafe 🚀
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal Kalender & Pasang Pengingat Agenda (Req 7) -->
   <div class="modal-backdrop" id="modal-calendar-export">
     <div class="modal-card" style="max-width: 440px;">
@@ -563,14 +524,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- MAMPIR Web Scripts -->
-  <script src="js/i18n.js?v=1.8"></script>
-  <script src="js/config.js?v=1.8"></script>
-  <script src="js/data.js?v=1.8"></script>
-  <script src="js/storage.js?v=1.8"></script>
-  <script src="js/auth.js?v=1.8"></script>
-  <script src="js/recommendation.js?v=1.8"></script>
-  <script src="js/map.js?v=1.8"></script>
-  <script src="js/roulette.js?v=1.8"></script>
-  <script src="js/app.js?v=1.8"></script>
+  <script src="js/i18n.js?v=2.4"></script>
+  <script src="js/config.js?v=2.4"></script>
+  <script src="js/data.js?v=2.4"></script>
+  <script src="js/storage.js?v=2.4"></script>
+  <script src="js/auth.js?v=2.4"></script>
+  <script src="js/recommendation.js?v=2.4"></script>
+  <script src="js/google_places.js?v=2.4"></script>
+  <script src="js/map.js?v=2.4"></script>
+  <script src="js/roulette.js?v=2.4"></script>
+  <script src="js/app.js?v=2.4"></script>
 </body>
 </html>

@@ -176,16 +176,15 @@ const StorageService = {
 
   // ==================== ROLE-BASED ACCESS CONTROL (RBAC) ====================
   getUserRole() {
-    return localStorage.getItem(this.KEYS.USER_ROLE) || 'user';
+    return 'user';
   },
 
   isAdmin() {
-    // Admin wajib memiliki role 'admin' DAN token otentikasi aktif
-    return this.getUserRole() === 'admin' && Boolean(this.getAuthToken());
+    return false;
   },
 
   isPartnerOrAdmin() {
-    return this.isAdmin();
+    return false;
   },
 
   getPartnerCafeId() {

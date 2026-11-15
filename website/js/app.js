@@ -18,6 +18,13 @@ window.App = {
   isApiOnline: false,
   isBudgetFilterActive: false,
   lastUpsell: null,
+  isGpsActive: false,
+  userGps: null,
+  detectedGooglePlaces: [],
+  nearMeDistanceFilter: 'all', // 'all', '0-1', '1-3', '3-5', '5-10', '10+'
+  nearMeCategoryFilter: 'all', // 'all', 'Restoran', 'Warung Makan', 'Cafe', 'Coffee Shop', 'Tempat Nongkrong', 'Fast Food', 'Street Food'
+  nearMeSortBy: 'jarak',       // 'jarak', 'rating', 'populer', 'harga_murah'
+  isNearMeLoading: false,
 
   async init() {
     console.log('Inisialisasi MAMPIR Web...');
@@ -47,11 +54,14 @@ window.App = {
     this.initNotificationCenter();
     this.updateBudgetButtonUI();
 
-    // Inisialisasi Peta Leaflet
+    // Inisialisasi Peta Leaflet (Google Maps Layers)
     MapController.init('live-map-container');
 
     // Fetch Master Data
     await this.fetchPlaces();
+
+    // Deteksi GPS & Sinkronkan Tempat Makan via Google Places API (New)
+    await this.triggerGpsDetection(false);
 
     // Check first launch for onboarding
     if (StorageService.isFirstLaunch()) {
@@ -137,6 +147,127 @@ window.App = {
   },
 
   /**
+   * Menjalankan deteksi lokasi GPS & menarik tempat makan nyata via Google Places API (New)
+   * @param {boolean} isManual - apakah dipicu oleh interaksi klik tombol pengguna
+   */
+  async triggerGpsDetection(isManual = false) {
+    const btn = document.getElementById('btn-gps-detect');
+    const label = document.getElementById('gps-status-label');
+
+    if (btn) btn.classList.add('detecting');
+    if (label) label.textContent = typeof window.t === 'function' ? window.t('gps_detecting', 'Mendeteksi GPS...') : 'Mendeteksi GPS...';
+
+    try {
+      const gps = await GooglePlacesService.detectGpsLocation();
+      this.userGps = gps;
+      this.isGpsActive = true;
+
+      // Sinkronkan titik acuan jarak di RecommendationService
+      if (typeof RecommendationService !== 'undefined') {
+        RecommendationService.setCenterCoordinates(gps.lat, gps.lng);
+      }
+
+      // 1. Tampilkan marker GPS dan radar radius di Google Maps
+      if (typeof MapController !== 'undefined') {
+        MapController.renderUserLocation(
+          gps.lat,
+          gps.lng,
+          gps.label,
+          gps.isWithinPurwokerto ? 3500 : 5000
+        );
+
+        if (isManual) {
+          MapController.panTo(gps.lat, gps.lng, 15);
+        }
+      }
+
+      // 2. Ambil warung makan, cafe, resto nyata dari Google Places API (New)
+      const nearbyGoogle = await GooglePlacesService.fetchPlacesNearLocation(gps.lat, gps.lng, 3000, this.nearMeCategoryFilter || 'all');
+
+      if (nearbyGoogle && nearbyGoogle.length > 0) {
+        this.detectedGooglePlaces = nearbyGoogle;
+        this.mergeGooglePlaces(nearbyGoogle, gps);
+      }
+
+      // 3. Hitung ulang jarak semua tempat dari GPS pengguna
+      this.recalculateAllDistances(gps.lat, gps.lng);
+
+      // 4. Perbarui status tombol GPS di Header
+      if (btn) {
+        btn.classList.remove('detecting');
+        btn.classList.add('active');
+        if (!gps.isWithinPurwokerto) btn.classList.add('outside');
+        else btn.classList.remove('outside');
+      }
+      if (label) {
+        if (gps.isWithinPurwokerto && !gps.isSimulated) {
+          label.textContent = `GPS: Purwokerto (${nearbyGoogle.length} terdeteksi)`;
+        } else if (!gps.isWithinPurwokerto) {
+          label.textContent = 'GPS: Simulasi Alun-Alun';
+        } else {
+          label.textContent = `GPS: Alun-Alun (${nearbyGoogle.length} terdeteksi)`;
+        }
+      }
+
+      // 5. Berikan feedback Toast ke pengguna
+      if (isManual) {
+        if (gps.isWithinPurwokerto && !gps.isSimulated) {
+          this.showToast(`📍 GPS Terdeteksi! Menemukan ${nearbyGoogle.length} warung & tempat makan via Google Maps.`);
+        } else if (!gps.isWithinPurwokerto) {
+          this.showToast(`ℹ️ GPS di luar Purwokerto. Menampilkan titik pusat Alun-Alun agar rekomendasi tetap akurat.`);
+        } else {
+          this.showToast(`📍 Titik GPS Purwokerto aktif (${nearbyGoogle.length} tempat makan dari Google Maps).`);
+        }
+      }
+
+      this.render();
+    } catch (e) {
+      console.warn('Gagal mendeteksi GPS atau Google Places:', e);
+      if (btn) btn.classList.remove('detecting');
+      if (label) label.textContent = 'GPS Purwokerto';
+    }
+  },
+
+  mergeGooglePlaces(googlePlaces, userGps) {
+    if (!googlePlaces || googlePlaces.length === 0) return;
+
+    const existingCoords = new Set(
+      this.places.map(p => `${(p.latitude || 0).toFixed(3)}_${(p.longitude || 0).toFixed(3)}`)
+    );
+    const existingNames = new Set(
+      this.places.map(p => (p.name || '').toLowerCase().trim())
+    );
+
+    const newPlaces = [];
+    for (const gp of googlePlaces) {
+      const coordKey = `${(gp.latitude || 0).toFixed(3)}_${(gp.longitude || 0).toFixed(3)}`;
+      const nameKey = (gp.name || '').toLowerCase().trim();
+
+      if (!existingCoords.has(coordKey) && !existingNames.has(nameKey)) {
+        newPlaces.push(gp);
+        existingCoords.add(coordKey);
+        existingNames.add(nameKey);
+      }
+    }
+
+    if (newPlaces.length > 0) {
+      this.places = [...newPlaces, ...this.places];
+      console.log(`Berhasil menambahkan ${newPlaces.length} tempat makan baru dari Google Maps ke direktori MAMPIR!`);
+    }
+  },
+
+  recalculateAllDistances(userLat, userLng) {
+    if (!userLat || !userLng) return;
+    this.places.forEach(p => {
+      if (p.latitude && p.longitude) {
+        const d = GooglePlacesService.calculateDistanceKm(userLat, userLng, p.latitude, p.longitude);
+        p.distance = d;
+        p.distanceFromGps = d;
+      }
+    });
+  },
+
+  /**
    * Menghitung & menyaring data tempat kuliner untuk ditampilkan
    */
   getProcessedPlaces() {
@@ -198,8 +329,8 @@ window.App = {
       return;
     }
 
-    if (this.currentView === 'admin') {
-      this.renderAdminDashboardView(catalogCol);
+    if (this.currentView === 'terdekat') {
+      this.renderNearMeView(catalogCol);
       return;
     }
 
@@ -314,7 +445,9 @@ window.App = {
     if (!place) return '';
     const isFav = StorageService.isFavorite(place.id);
     const catLabel = typeof I18nService !== 'undefined' ? I18nService.translateCategory(place.category) : place.category;
-    const kmText = window.t('km_from_center', 'km dari Alun-Alun');
+    const kmText = (this.isGpsActive && this.userGps)
+      ? window.t('distance_from_gps', 'km dari lokasi GPS Anda')
+      : window.t('km_from_center', 'km dari Alun-Alun');
     return `
       <div class="featured-card" onclick="window.App.openPlaceDetail('${place.id}')">
         <div class="featured-image-container">
@@ -322,6 +455,7 @@ window.App = {
           <div class="featured-overlay"></div>
           <div class="featured-badges">
             <span class="badge-featured">${window.t('top_recommendation', 'Rekomendasi Utama')}</span>
+            ${place.isGoogleLive ? `<span class="badge-google-live">🗺️ Google Maps Live</span>` : ''}
             ${(this.isBudgetFilterActive && place.isBestBudgetMatch) ? `<span class="badge-featured" style="background: linear-gradient(135deg, #FFB74D, #F57C00);">✨ ${window.t('budget_badge_best_match', 'Pas di Budget')}</span>` : ''}
             <span class="badge-score">⭐ ${place.rating || 4.8}</span>
           </div>
@@ -437,7 +571,10 @@ window.App = {
             <h4 class="place-card-title">${place.name}</h4>
             <div class="place-card-rating">⭐ ${place.rating || 4.5}</div>
           </div>
-          <div class="place-card-location">📍 ${place.city} • ${place.distance || 0} km</div>
+          <div class="place-card-location">
+            <span>📍 ${place.city} • ${place.distance || 0} km</span>
+            ${place.isGoogleLive ? `<span class="badge-google-live" style="margin-left: 6px;">🗺️ Google Maps</span>` : ''}
+          </div>
           <div class="place-card-reason">${place.reasonBadge || window.t('budget_friendly', 'Pas di kantong')}</div>
           ${comboHtml}
           <div class="place-card-facilities">
@@ -567,6 +704,21 @@ window.App = {
       regionSelect.addEventListener('change', (e) => {
         this.selectedRegion = e.target.value;
         StorageService.setSelectedRegion(this.selectedRegion);
+
+        // Arahkan kamera Google Maps ke wilayah yang dipilih
+        const regionCoordinates = {
+          'Purwokerto Kota': { lat: -7.4243, lng: 109.2303, zoom: 14 },
+          'Baturraden': { lat: -7.3150, lng: 109.2250, zoom: 14 },
+          'Purwokerto Utara (Unsoed)': { lat: -7.4020, lng: 109.2450, zoom: 14 },
+          'Sokaraja': { lat: -7.4580, lng: 109.2880, zoom: 14 },
+          'Purwokerto Timur & Sumbang': { lat: -7.3850, lng: 109.2600, zoom: 13 },
+          'Purwokerto Barat & Selatan': { lat: -7.4350, lng: 109.2150, zoom: 14 }
+        };
+        const coords = regionCoordinates[this.selectedRegion];
+        if (coords && typeof MapController !== 'undefined') {
+          MapController.panTo(coords.lat, coords.lng, coords.zoom);
+        }
+
         this.render();
       });
     }
@@ -626,6 +778,7 @@ window.App = {
   },
 
   switchView(viewName) {
+    if (viewName === 'admin') viewName = 'beranda';
     this.currentView = viewName;
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => {
       el.classList.toggle('active', el.getAttribute('data-view') === viewName);
@@ -634,6 +787,11 @@ window.App = {
     // Invalidate map size when switching back
     MapController.invalidateSize();
     this.render();
+
+    // Pastikan data tempat terdekat dari titik GPS aktif langsung diambil
+    if (viewName === 'terdekat') {
+      this.ensureNearMePlacesLoaded();
+    }
   },
 
   selectCategory(cat) {
@@ -764,10 +922,16 @@ window.App = {
           </svg>
           <span>${window.t('btn_contact_wa', 'Hubungi Pengelola')}</span>
         </a>
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}" target="_blank"
+        <a href="${(this.userGps && this.userGps.lat) ? `https://www.google.com/maps/dir/?api=1&origin=${this.userGps.lat},${this.userGps.lng}&destination=${place.latitude},${place.longitude}` : `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`}" target="_blank"
            class="btn-primary" style="flex: 1; min-width: 200px; text-align: center; text-decoration: none; justify-content: center;">
           🗺️ ${window.t('route_btn', 'Buka Rute di Google Maps')}
         </a>
+        ${place.googleMapsUri ? `
+          <a href="${place.googleMapsUri}" target="_blank"
+             class="btn-secondary" style="font-size: 13px; padding: 10px 16px; text-decoration: none; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+            📍 Google Maps Profile
+          </a>
+        ` : ''}
       </div>
 
       <!-- Agenda & Pengumuman Kafe (Req 2 & Req 7: Kalender & Pasang Pengingat) -->
@@ -1210,9 +1374,6 @@ window.App = {
     }
 
     if (res.success) {
-      if (email.toLowerCase().includes('mitra') || email.toLowerCase().includes('admin')) {
-        StorageService.setUserRole('partner', 'pwt-1');
-      }
       this.closeModal('modal-auth');
       this.updateUserProfileUI();
       this.showToast(`Selamat datang, ${res.name}! ✨`);
@@ -1255,6 +1416,480 @@ window.App = {
     }
   },
 
+  // ==================== GOJEK-STYLE NEAR ME (TEMPAT TERDEKAT) ====================
+
+  /**
+   * Menyaring dan mengurutkan daftar tempat terdekat berdasarkan GPS & filter aktif
+   */
+  getNearMeProcessedPlaces() {
+    const all = this.getMergedPlacesList();
+    const userLat = this.userGps ? this.userGps.lat : AppConfig.centerCoordinates.lat;
+    const userLng = this.userGps ? this.userGps.lng : AppConfig.centerCoordinates.lng;
+
+    // 1. Saring hanya tempat yang memiliki koordinat valid
+    let list = all.filter(p => typeof p.latitude === 'number' && typeof p.longitude === 'number');
+
+    // 2. Hitung jarak matematis presisi (Haversine) dari GPS pengguna
+    list = list.map(p => {
+      const dist = (window.GooglePlacesService && typeof window.GooglePlacesService.calculateDistanceKm === 'function')
+        ? GooglePlacesService.calculateDistanceKm(userLat, userLng, p.latitude, p.longitude)
+        : 0;
+      return {
+        ...p,
+        distanceFromGps: dist,
+        distance: dist
+      };
+    });
+
+    // 3. Filter Jarak Terdekat (0-1 km, 1-3 km, 3-5 km, 5-10 km, > 10 km)
+    if (this.nearMeDistanceFilter === '0-1') {
+      list = list.filter(p => p.distanceFromGps >= 0 && p.distanceFromGps <= 1.0);
+    } else if (this.nearMeDistanceFilter === '1-3') {
+      list = list.filter(p => p.distanceFromGps > 1.0 && p.distanceFromGps <= 3.0);
+    } else if (this.nearMeDistanceFilter === '3-5') {
+      list = list.filter(p => p.distanceFromGps > 3.0 && p.distanceFromGps <= 5.0);
+    } else if (this.nearMeDistanceFilter === '5-10') {
+      list = list.filter(p => p.distanceFromGps > 5.0 && p.distanceFromGps <= 10.0);
+    } else if (this.nearMeDistanceFilter === '10+') {
+      list = list.filter(p => p.distanceFromGps > 10.0);
+    }
+
+    // 4. Filter Kategori Tempat (Restoran, Warung Makan, Cafe, Coffee Shop, Tempat Nongkrong, Fast Food, Street Food)
+    if (this.nearMeCategoryFilter && this.nearMeCategoryFilter !== 'all') {
+      const targetCat = this.nearMeCategoryFilter.toLowerCase();
+      list = list.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        const name = (p.name || '').toLowerCase();
+        if (targetCat === 'tempat nongkrong') {
+          return cat.includes('nongkrong') || cat.includes('cafe') || cat.includes('coffee') || cat.includes('warkop') || name.includes('nongkrong') || name.includes('space');
+        }
+        if (targetCat === 'warung makan') {
+          return cat.includes('warung') || cat.includes('soto') || cat.includes('bakso') || cat.includes('mendoan') || name.includes('warung') || name.includes('soto') || name.includes('bakso');
+        }
+        if (targetCat === 'fast food') {
+          return cat.includes('fast') || name.includes('chicken') || name.includes('burger') || name.includes('pizza') || name.includes('gacoan') || name.includes('wizzmie');
+        }
+        if (targetCat === 'street food') {
+          return cat.includes('street') || name.includes('angkringan') || name.includes('kaki lima') || name.includes('kuliner malam');
+        }
+        return cat.includes(targetCat) || targetCat.includes(cat);
+      });
+    }
+
+    // 5. Pengurutan (Terdekat, Rating Tertinggi, Paling Populer, Harga Termurah)
+    if (this.nearMeSortBy === 'rating') {
+      list.sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.review_count || 0) - (a.review_count || 0));
+    } else if (this.nearMeSortBy === 'populer') {
+      list.sort((a, b) => (b.review_count || 0) - (a.review_count || 0));
+    } else if (this.nearMeSortBy === 'harga_murah') {
+      list.sort((a, b) => (a.min_price || 0) - (b.min_price || 0));
+    } else {
+      // Default: Terdekat dari lokasi pengguna (jarak terpendek)
+      list.sort((a, b) => a.distanceFromGps - b.distanceFromGps);
+    }
+
+    return list;
+  },
+
+  /**
+   * Render tampilan utama "Near Me" ala Gojek
+   */
+  renderNearMeView(container) {
+    const nearMePlaces = this.getNearMeProcessedPlaces();
+    const userLat = this.userGps ? this.userGps.lat : AppConfig.centerCoordinates.lat;
+    const userLng = this.userGps ? this.userGps.lng : AppConfig.centerCoordinates.lng;
+    const userLabel = this.userGps ? this.userGps.label : 'Pusat Alun-Alun Purwokerto';
+
+    // 1. Sinkronisasi Marker Peta Google Maps
+    MapController.renderMarkers(nearMePlaces, (place) => {
+      this.openPlaceDetail(place.id);
+    });
+
+    // 2. Auto-fit bounds peta agar mencakup semua tempat dan lokasi pengguna
+    MapController.fitBoundsToPlacesAndUser(nearMePlaces, this.userGps);
+
+    // 3. Perbarui lingkaran radar jarak deteksi di peta sesuai filter aktif
+    let radiusMeters = 5000;
+    if (this.nearMeDistanceFilter === '0-1') radiusMeters = 1000;
+    else if (this.nearMeDistanceFilter === '1-3') radiusMeters = 3000;
+    else if (this.nearMeDistanceFilter === '3-5') radiusMeters = 5000;
+    else if (this.nearMeDistanceFilter === '5-10') radiusMeters = 10000;
+    else if (this.nearMeDistanceFilter === '10+') radiusMeters = 18000;
+
+    if (this.userGps) {
+      MapController.renderUserLocation(userLat, userLng, userLabel, radiusMeters);
+    }
+
+    // Pilihan Filter Jarak
+    const distOptions = [
+      { key: 'all', label: window.t('dist_all', 'Semua Jarak') },
+      { key: '0-1', label: window.t('dist_0_1', '0–1 km') },
+      { key: '1-3', label: window.t('dist_1_3', '1–3 km') },
+      { key: '3-5', label: window.t('dist_3_5', '3–5 km') },
+      { key: '5-10', label: window.t('dist_5_10', '5–10 km') },
+      { key: '10+', label: window.t('dist_10_plus', '> 10 km') }
+    ];
+
+    // Pilihan Filter Kategori Tempat (7 Kategori Permintaan Pengguna)
+    const catOptions = [
+      { key: 'all', label: window.t('cat_all_food', 'Semua Kategori'), icon: '🍽️' },
+      { key: 'Restoran', label: window.t('cat_resto', 'Restoran'), icon: '🍲' },
+      { key: 'Warung Makan', label: window.t('cat_warung', 'Warung Makan'), icon: '🍛' },
+      { key: 'Cafe', label: window.t('cat_cafe', 'Cafe'), icon: '☕' },
+      { key: 'Coffee Shop', label: window.t('cat_coffee', 'Coffee Shop'), icon: '🧋' },
+      { key: 'Tempat Nongkrong', label: window.t('cat_nongkrong', 'Tempat Nongkrong'), icon: '✨' },
+      { key: 'Fast Food', label: window.t('cat_fastfood', 'Fast Food'), icon: '🍔' },
+      { key: 'Street Food', label: window.t('cat_streetfood', 'Street Food'), icon: '🍢' }
+    ];
+
+    // Titik Pengujian Cepat di Sekitar Purwokerto
+    const testLocations = [
+      { name: 'Alun-Alun Pwt', lat: -7.4243, lng: 109.2302 },
+      { name: 'Unsoed Grendeng', lat: -7.4087, lng: 109.2483 },
+      { name: 'Baturraden', lat: -7.3150, lng: 109.2272 },
+      { name: 'Sokaraja', lat: -7.4580, lng: 109.2880 },
+      { name: 'Stasiun Pwt', lat: -7.4187, lng: 109.2217 }
+    ];
+
+    let html = `
+      <div class="nearme-view-container">
+        <!-- Header Banner Near Me -->
+        <div class="nearme-header-banner">
+          <div class="nearme-header-text">
+            <h2 class="nearme-title">📍 ${window.t('nearme_title', 'Tempat Makan & Nongkrong Terdekat')}</h2>
+            <p class="nearme-subtitle">${window.t('nearme_subtitle', 'Pencarian akurat berbasis GPS & Google Maps Platform ala Gojek')}</p>
+          </div>
+          <button class="btn-refresh-gps ${this.isNearMeLoading ? 'loading' : ''}" onclick="window.App.triggerGpsDetection(true)" title="${window.t('btn_refresh_location', 'Perbarui Lokasi')}">
+            <span class="refresh-icon">🔄</span>
+            <span>${window.t('btn_refresh_location', 'Perbarui Lokasi')}</span>
+          </button>
+        </div>
+
+        <!-- Kartu Lokasi Pengguna & Titik Uji Cepat -->
+        <div class="nearme-location-card">
+          <div class="nearme-location-status">
+            <span class="pulse-indicator-dot"></span>
+            <div>
+              <div class="location-label-title">Titik Pusat Pencarian Saat Ini:</div>
+              <div class="location-name-bold">
+                ${userLabel}
+                <span class="coord-tag">(${userLat.toFixed(4)}, ${userLng.toFixed(4)})</span>
+              </div>
+            </div>
+          </div>
+          <div class="nearme-test-chips">
+            <span class="test-chip-label">${window.t('nearme_test_location', 'Uji Titik Lokasi:')}</span>
+            ${testLocations.map(tl => {
+              const isActive = Math.abs(userLat - tl.lat) < 0.005 && Math.abs(userLng - tl.lng) < 0.005;
+              return `
+                <button class="btn-test-loc-chip ${isActive ? 'active' : ''}"
+                        onclick="window.App.setNearMeManualLocation(${tl.lat}, ${tl.lng}, '${tl.name}')">
+                  📍 ${tl.name}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Filter Jarak Terdekat (Chips) -->
+        <div class="nearme-filter-section">
+          <div class="filter-section-title">📏 Filter Jarak Terdekat:</div>
+          <div class="nearme-chips-scroll">
+            ${distOptions.map(opt => `
+              <button class="chip-filter-item ${this.nearMeDistanceFilter === opt.key ? 'active' : ''}"
+                      onclick="window.App.setNearMeDistanceFilter('${opt.key}')">
+                ${opt.label}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Filter Kategori Tempat (Chips) -->
+        <div class="nearme-filter-section">
+          <div class="filter-section-title">🍴 Filter Kategori Tempat:</div>
+          <div class="nearme-chips-scroll">
+            ${catOptions.map(cat => `
+              <button class="chip-filter-item ${this.nearMeCategoryFilter === cat.key ? 'active' : ''}"
+                      onclick="window.App.setNearMeCategoryFilter('${cat.key}')">
+                <span>${cat.icon}</span> <span>${cat.label}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Baris Meta (Jumlah Hasil & Pengurutan) -->
+        <div class="nearme-meta-row">
+          <div class="nearme-results-count">
+            ${window.t('nearme_places_found', '<strong>{count}</strong> tempat terdekat ditemukan', { count: nearMePlaces.length })}
+            ${this.isNearMeLoading ? '<span class="loading-spinner-inline">⏳ Memuat data Google Maps...</span>' : ''}
+          </div>
+          <div class="nearme-sort-wrapper">
+            <label for="nearme-sort-select">Urutkan:</label>
+            <select id="nearme-sort-select" class="nearme-sort-select" onchange="window.App.setNearMeSortBy(this.value)">
+              <option value="jarak" ${this.nearMeSortBy === 'jarak' ? 'selected' : ''}>📍 ${window.t('nearme_sort_nearest', 'Terdekat')}</option>
+              <option value="rating" ${this.nearMeSortBy === 'rating' ? 'selected' : ''}>⭐ ${window.t('nearme_sort_rating', 'Rating Tertinggi')}</option>
+              <option value="populer" ${this.nearMeSortBy === 'populer' ? 'selected' : ''}>🔥 ${window.t('nearme_sort_populer', 'Paling Populer')}</option>
+              <option value="harga_murah" ${this.nearMeSortBy === 'harga_murah' ? 'selected' : ''}>💰 ${window.t('nearme_sort_cheap', 'Harga Termurah')}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Daftar Kartu Tempat Terdekat Ala Gojek -->
+        <div class="nearme-cards-list">
+    `;
+
+    if (nearMePlaces.length === 0) {
+      html += `
+        <div class="nearme-empty-card">
+          <div class="empty-icon">📍</div>
+          <h3 class="empty-title">${window.t('nearme_empty_title', 'Tidak Ada Tempat dalam Radius Ini')}</h3>
+          <p class="empty-desc">${window.t('nearme_empty_desc', 'Belum ada tempat makan atau nongkrong dalam jarak yang dipilih. Sedang memeriksa Google Maps Platform...')}</p>
+          <div style="display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+            <button class="btn-primary" onclick="window.App.ensureNearMePlacesLoaded(true)">
+              🔄 Cari Ulang via Google Maps
+            </button>
+            <button class="btn-secondary" onclick="window.App.setNearMeDistanceFilter('all')">
+              📏 ${window.t('btn_expand_radius', 'Perluas Radius Jarak')}
+            </button>
+            <button class="btn-secondary" onclick="window.App.setNearMeCategoryFilter('all')">
+              🍽️ Reset Kategori
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      html += nearMePlaces.map(place => this.renderGojekNearMeCard(place)).join('');
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+
+    // Auto-healing: Jika daftar 0 tempat dan tidak sedang loading, segera tarik tempat terdekat Google Places
+    if (nearMePlaces.length === 0 && !this.isNearMeLoading && !this._isAutoFetchingNearMe) {
+      this._isAutoFetchingNearMe = true;
+      setTimeout(() => {
+        this._isAutoFetchingNearMe = false;
+        if (this.currentView === 'terdekat') {
+          this.ensureNearMePlacesLoaded(true);
+        }
+      }, 50);
+    }
+  },
+
+  /**
+   * Render kartu tempat kuliner individual dengan layout & estetika ala Gojek
+   */
+  renderGojekNearMeCard(place) {
+    const formattedDistance = (window.GooglePlacesService && typeof window.GooglePlacesService.formatDistance === 'function')
+      ? GooglePlacesService.formatDistance(place.distanceFromGps)
+      : `${(place.distanceFromGps || 0).toFixed(1)} km`;
+
+    const catLabel = typeof I18nService !== 'undefined'
+      ? I18nService.translateCategory(place.category || 'Cafe')
+      : (place.category || 'Cafe');
+
+    const isLive = !!place.isGoogleLive;
+
+    // Status Buka Sekarang (Open Now)
+    let openStatusBadge = '';
+    if (place.isOpenNow === true) {
+      openStatusBadge = `<span class="badge-open-now">● ${window.t('status_open', 'Buka Sekarang')}</span>`;
+    } else if (place.isOpenNow === false) {
+      openStatusBadge = `<span class="badge-closed">● ${window.t('status_closed', 'Tutup')}</span>`;
+    } else {
+      openStatusBadge = `<span class="badge-hours">🕒 ${place.open_hours || '09.00 - 22.00 WIB'}</span>`;
+    }
+
+    // Google Maps Direction URL Turn-by-Turn
+    const userGps = this.userGps;
+    let dirUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`;
+    if (userGps && userGps.lat && userGps.lng) {
+      dirUrl += `&origin=${userGps.lat},${userGps.lng}`;
+    }
+
+    const priceText = RecommendationService.formatPrice(place);
+    const detailLabel = window.t('view_detail', 'Lihat Detail');
+    const directionsLabel = window.t('btn_directions', 'Petunjuk Arah');
+    const showMapLabel = window.t('nearme_show_map', 'Lihat di Peta');
+
+    return `
+      <div class="gojek-nearme-card" id="nearme-card-${place.id}">
+        <div class="gojek-card-media">
+          <img src="${place.image_url || 'assets/images/beranda_mockup.jpeg'}" alt="${place.name}" class="gojek-card-img" loading="lazy" />
+          <div class="gojek-media-badges">
+            <span class="badge-cat-pill">${catLabel}</span>
+            ${openStatusBadge}
+          </div>
+        </div>
+        <div class="gojek-card-content">
+          <div class="gojek-card-top">
+            <div class="gojek-title-row">
+              <h3 class="gojek-card-title" onclick="window.App.openPlaceDetail('${place.id}')">${place.name}</h3>
+              ${isLive ? '<span class="badge-google-live" title="Terverifikasi Google Maps Live">🗺️ Live</span>' : ''}
+            </div>
+            <div class="gojek-distance-badge" title="Jarak matematis dari lokasi Anda">
+              <span class="dist-icon">📍</span>
+              <strong class="dist-number">${formattedDistance}</strong>
+            </div>
+          </div>
+
+          <div class="gojek-rating-row">
+            <span class="gojek-rating-star">⭐</span>
+            <strong class="gojek-rating-val">${(place.rating || 4.5).toFixed(1)}</strong>
+            <span class="gojek-reviews-count">(${Number(place.review_count || 120).toLocaleString('id-ID')} ulasan)</span>
+            <span class="gojek-dot-divider">•</span>
+            <span class="gojek-price-range">${priceText}</span>
+          </div>
+
+          <p class="gojek-card-address" title="${place.address || place.city || 'Purwokerto'}">
+            <span class="addr-icon">📌</span>
+            <span>${place.address || place.city || 'Purwokerto, Jawa Tengah'}</span>
+          </p>
+
+          <div class="gojek-card-actions">
+            <button class="btn-gojek-detail" onclick="window.App.openPlaceDetail('${place.id}')">
+              ${detailLabel}
+            </button>
+            <a href="${dirUrl}" target="_blank" class="btn-gojek-direction" rel="noopener noreferrer">
+              <span>🧭 ${directionsLabel}</span>
+            </a>
+            <button class="btn-gojek-map" onclick="window.MapController.highlightMarker('${place.id}')" title="${showMapLabel}">
+              <span>🗺️ Peta</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Mengubah filter jarak terdekat
+   */
+  async setNearMeDistanceFilter(dist) {
+    this.nearMeDistanceFilter = dist;
+    this.render();
+
+    // Jika filter jarak 0-1 km atau 1-3 km dan belum ada hasil, segera fetch Google Places
+    const currentMatches = this.getNearMeProcessedPlaces();
+    if (currentMatches.length === 0) {
+      await this.ensureNearMePlacesLoaded(true);
+    }
+  },
+
+  /**
+   * Memastikan tempat-tempat terdekat dari koordinat GPS aktif telah termuat di memori
+   */
+  async ensureNearMePlacesLoaded(force = false) {
+    if (!window.GooglePlacesService) return;
+    const userLat = this.userGps ? this.userGps.lat : AppConfig.centerCoordinates.lat;
+    const userLng = this.userGps ? this.userGps.lng : AppConfig.centerCoordinates.lng;
+
+    // Hitung berapa tempat yang ada dalam jarak <= 1.5 km
+    const countUnder1500m = this.places.filter(p => {
+      if (!p.latitude || !p.longitude) return false;
+      const d = GooglePlacesService.calculateDistanceKm(userLat, userLng, p.latitude, p.longitude);
+      return d <= 1.5;
+    }).length;
+
+    if (countUnder1500m >= 5 && !force) {
+      return;
+    }
+
+    this.isNearMeLoading = true;
+    this.render();
+
+    try {
+      const places = await GooglePlacesService.fetchPlacesNearLocation(
+        userLat,
+        userLng,
+        3000,
+        this.nearMeCategoryFilter || 'all'
+      );
+      if (places && places.length > 0) {
+        this.mergeGooglePlaces(places, this.userGps);
+        this.recalculateAllDistances(userLat, userLng);
+      }
+    } catch (e) {
+      console.warn('Gagal memuat tempat terdekat Google Places:', e);
+    } finally {
+      this.isNearMeLoading = false;
+      this.render();
+    }
+  },
+
+  /**
+   * Mengubah filter kategori tempat (dan menarik data Google Places API jika kategori baru)
+   */
+  async setNearMeCategoryFilter(category) {
+    this.nearMeCategoryFilter = category;
+    const userLat = this.userGps ? this.userGps.lat : AppConfig.centerCoordinates.lat;
+    const userLng = this.userGps ? this.userGps.lng : AppConfig.centerCoordinates.lng;
+
+    if (window.GooglePlacesService) {
+      this.isNearMeLoading = true;
+      this.render();
+      try {
+        const places = await GooglePlacesService.fetchPlacesNearLocation(userLat, userLng, 3000, category);
+        if (places && places.length > 0) {
+          this.mergeGooglePlaces(places, this.userGps);
+          this.recalculateAllDistances(userLat, userLng);
+        }
+      } catch (e) {
+        console.warn('Gagal memuat kategori dari Google Places:', e);
+      } finally {
+        this.isNearMeLoading = false;
+      }
+    }
+    this.render();
+  },
+
+  /**
+   * Mengubah metode pengurutan
+   */
+  setNearMeSortBy(sort) {
+    this.nearMeSortBy = sort;
+    this.render();
+  },
+
+  /**
+   * Mengubah titik lokasi manual untuk simulasi/pengujian instan
+   */
+  async setNearMeManualLocation(lat, lng, label) {
+    if (!window.GooglePlacesService) return;
+    this.isNearMeLoading = true;
+    const gps = GooglePlacesService.setManualLocation(lat, lng, label);
+    this.userGps = gps;
+    this.isGpsActive = true;
+
+    if (typeof RecommendationService !== 'undefined') {
+      RecommendationService.setCenterCoordinates(lat, lng);
+    }
+
+    if (typeof MapController !== 'undefined') {
+      MapController.renderUserLocation(lat, lng, label, 3500);
+      MapController.panTo(lat, lng, 14);
+    }
+
+    try {
+      const places = await GooglePlacesService.fetchPlacesNearLocation(lat, lng, 3000, this.nearMeCategoryFilter || 'all');
+      if (places && places.length > 0) {
+        this.mergeGooglePlaces(places, gps);
+      }
+      this.recalculateAllDistances(lat, lng);
+    } catch (e) {
+      console.warn('Gagal memperbarui tempat manual:', e);
+    } finally {
+      this.isNearMeLoading = false;
+    }
+
+    this.showToast(`📍 Lokasi diubah ke: ${label}`);
+    this.render();
+  },
+
   // ==================== HELP CENTER & EDUKASI (Req 6) ====================
   renderHelpCenterView(container) {
     const isEn = typeof I18nService !== 'undefined' && I18nService.getLanguage() === 'en';
@@ -1282,10 +1917,10 @@ window.App = {
       },
       {
         cat: 'partner',
-        q: isEn ? 'How can cafe owners register or manage their listings?' : 'Bagaimana cara mendaftarkan kafe sebagai Mitra di MAMPIR?',
+        q: isEn ? 'How can cafe owners list or update their cafe on MAMPIR?' : 'Bagaimana jika pengelola ingin mendaftarkan atau memperbarui data kafe di MAMPIR?',
         a: isEn
-          ? 'Cafe owners can access the "Admin & Mitra" tab in the sidebar. Once logged in as a Cafe Partner, you can edit operating hours, WhatsApp links, update menu highlights, and post promotional events/agendas.'
-          : 'Pengelola kafe dapat mengakses menu "Admin & Mitra" di sidebar. Setelah masuk sebagai Mitra Kafe, Anda dapat mengelola jam buka, tautan WhatsApp, memperbarui menu andalan, serta menerbitkan agenda promosi atau live music.'
+          ? 'Cafe owners can easily contact the MAMPIR Helpdesk directly via WhatsApp. Our team will verify and update your operating hours, menu highlights, and photos within 24 hours.'
+          : 'Pengelola kafe dapat menghubungi Helpdesk MAMPIR secara langsung via WhatsApp. Tim kami akan memverifikasi dan memperbarui data jam buka, menu unggulan, hingga foto kafe dalam 1x24 jam.'
       },
       {
         cat: 'general',
@@ -1300,7 +1935,7 @@ window.App = {
       <div class="help-center-wrapper">
         <div>
           <h2 class="section-title">❓ ${typeof I18nService !== 'undefined' ? I18nService.t('help_title') : 'Pusat Bantuan & Edukasi MAMPIR'}</h2>
-          <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">${typeof I18nService !== 'undefined' ? I18nService.t('help_subtitle') : 'Panduan lengkap jelajah kuliner Purwokerto dan integrasi mitra pengelola kafe.'}</p>
+          <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">${typeof I18nService !== 'undefined' ? I18nService.t('help_subtitle') : 'Panduan lengkap jelajah kuliner dan informasi aplikasi MAMPIR Purwokerto.'}</p>
         </div>
 
         <div class="faq-search-box">
@@ -1322,19 +1957,16 @@ window.App = {
           `).join('')}
         </div>
 
-        <!-- Callout Banner Mitra Pengelola Kafe -->
+        <!-- Callout Banner Helpdesk -->
         <div class="mitra-callout-card">
           <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-            🤝 ${typeof I18nService !== 'undefined' ? I18nService.t('mitra_guide_box_title') : 'Ingin Kafe Anda Terdaftar di MAMPIR?'}
+            🤝 ${typeof I18nService !== 'undefined' ? I18nService.t('mitra_guide_box_title') : 'Butuh Bantuan atau Ingin Mendaftarkan Kafe?'}
           </h3>
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-            ${typeof I18nService !== 'undefined' ? I18nService.t('mitra_guide_box_desc') : 'Daftarkan kafe Anda untuk menjangkau ribuan mahasiswa dan penikmat kuliner di Purwokerto.'}
+            ${typeof I18nService !== 'undefined' ? I18nService.t('mitra_guide_box_desc') : 'Hubungi tim layanan bantuan resmi MAMPIR via WhatsApp untuk pertanyaan seputar aplikasi atau informasi pendaftaran direktori kafe.'}
           </p>
           <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;">
-            <button class="btn-primary" onclick="window.App.switchView('admin')">
-              🛡️ ${typeof I18nService !== 'undefined' ? I18nService.t('btn_register_mitra') : 'Masuk / Daftar Akun Pengelola Kafe'}
-            </button>
-            <a href="https://wa.me/6281234567890?text=${encodeURIComponent('Halo Helpdesk MAMPIR, saya tertarik bermitra untuk kafe saya:')}" target="_blank"
+            <a href="https://wa.me/6281234567890?text=${encodeURIComponent('Halo Helpdesk MAMPIR, saya tertarik mendaftarkan / memperbarui data kafe saya:')}" target="_blank"
                class="btn-cta-whatsapp" style="text-decoration: none;">
               💬 ${typeof I18nService !== 'undefined' ? I18nService.t('btn_contact_support') : 'Hubungi Helpdesk MAMPIR (WhatsApp)'}
             </a>
@@ -1350,470 +1982,6 @@ window.App = {
       const text = item.textContent.toLowerCase();
       item.style.display = text.includes(clean) ? 'block' : 'none';
     });
-  },
-
-  // ==================== ADMIN & MITRA DASHBOARD (Req 2) ====================
-  renderAdminDashboardView(container) {
-    const isPartner = StorageService.isPartnerOrAdmin();
-    const session = StorageService.getUserSession();
-
-    // 1. GATED ACCESS (RBAC) JIKA BUKAN ADMINISTRATOR
-    if (!isPartner) {
-      container.innerHTML = `
-        <div class="admin-dashboard-wrapper">
-          <div class="admin-gate-card">
-            <div style="font-size: 52px; margin-bottom: 8px;">🛡️</div>
-            <h2 style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;">
-              ${window.t('admin_gate_title', 'Area Khusus Administrator MAMPIR')}
-            </h2>
-            <p style="font-size: 13px; color: var(--text-secondary); max-width: 500px; line-height: 1.6; margin-bottom: 16px;">
-              ${window.t('admin_gate_desc', 'Halaman ini dilindungi sistem <strong>Role-Based Access Control (RBAC)</strong>. Pengguna umum <strong>tidak memiliki izin</strong> untuk mengelola data, mengubah kontak WhatsApp, atau mempublikasikan agenda kafe.')}
-            </p>
-
-            <!-- Status Akun Aktif Pengunjung -->
-            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-sm); padding: 12px 18px; margin-bottom: 20px; max-width: 440px; text-align: left; margin-left: auto; margin-right: auto;">
-              <div style="font-size: 13px; color: var(--text-primary); font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                <span>👤 ${window.t('admin_status_your', 'Status Anda:')} <strong>${session.name || 'Pengunjung'}</strong></span>
-                <span style="font-size: 10px; padding: 2px 8px; border-radius: 99px; background: #EF4444; color: white; font-weight: 800;">${window.t('admin_role_user', 'ROLE: USER (HANYA BACA)')}</span>
-              </div>
-              <p style="font-size: 11px; color: var(--text-secondary); margin: 6px 0 0 0; line-height: 1.4;">
-                ${window.t('admin_gate_warning', '⛔ Anda hanya memiliki hak akses jelajah direktori. Untuk mengelola direktori kafe, silakan lakukan otentikasi menggunakan kredensial Administrator resmi di bawah.')}
-              </p>
-            </div>
-
-            <!-- Alert Box Error -->
-            <div id="admin-gate-error" style="display: none; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; color: #EF4444; max-width: 440px; margin-left: auto; margin-right: auto; text-align: left;"></div>
-
-            <!-- FORM LOGIN KHUSUS ADMIN -->
-            <form onsubmit="event.preventDefault(); window.App.handleAdminGateLogin();" style="max-width: 440px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; text-align: left;">
-              <div class="form-group" style="margin: 0;">
-                <label style="font-size: 12px; font-weight: 700;">${window.t('admin_gate_email_label', 'Email / ID Administrator:')}</label>
-                <input type="text" id="admin-gate-email" class="form-control" placeholder="admin@mampir.com" required autocomplete="username" />
-              </div>
-              <div class="form-group" style="margin: 0;">
-                <label style="font-size: 12px; font-weight: 700;">${window.t('admin_gate_pass_label', 'Kata Sandi / Kunci Akses Admin:')}</label>
-                <input type="password" id="admin-gate-password" class="form-control" placeholder="••••••••" required autocomplete="current-password" />
-              </div>
-
-              <button type="submit" id="btn-admin-gate-submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 11px; margin-top: 4px;">
-                ${window.t('admin_gate_btn_submit', '🔐 Verifikasi & Buka Panel Admin')}
-              </button>
-
-              <div style="font-size: 11px; color: var(--text-muted); background: var(--bg-surface); border: 1px dashed var(--border-color); padding: 8px 12px; border-radius: var(--radius-sm); line-height: 1.5; margin-top: 4px;">
-                🔒 <strong>${window.t('admin_gate_notice_title', 'Akses Terbatas Administrator:')}</strong><br/>
-                ${window.t('admin_gate_notice_desc', 'Masuk menggunakan akun Supabase Auth yang terdaftar dengan hak akses Administrator (role: admin) pada sistem MAMPIR.')}
-              </div>
-            </form>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    // 2. DASHBOARD TERBUKA UNTUK ADMINISTRATOR RESMI
-    const managedCafeId = StorageService.getPartnerCafeId();
-    const currentCafe = this.getPlaceById(managedCafeId) || this.places[0];
-    const events = StorageService.getCafeEvents(currentCafe?.id);
-
-    container.innerHTML = `
-      <div class="admin-dashboard-wrapper">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <h2 class="section-title" style="margin: 0;">🛡️ ${window.t('admin_panel_title', 'Panel Administrator Direktori MAMPIR')}</h2>
-              <span style="font-size: 11px; padding: 3px 10px; background: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; color: #10B981; border-radius: 99px; font-weight: 700;">
-                Admin: ${session.name || 'Administrator'}
-              </span>
-            </div>
-            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">${window.t('admin_panel_subtitle', 'Kelola profil kafe, jam operasional, tautan WhatsApp pengelola, dan publikasikan agenda acara.')}</p>
-          </div>
-          <button class="btn-secondary" style="color: #EF4444;" onclick="window.App.logoutAdmin()">
-            ${window.t('admin_btn_exit', '🔒 Keluar dari Panel Admin')}
-          </button>
-        </div>
-
-        <!-- 3 Kartu Metrik -->
-        <div class="admin-stat-grid">
-          <div class="admin-stat-card">
-            <small style="color: var(--text-muted);">${window.t('admin_stats_cafes', 'Kafe Dikelola')}</small>
-            <div class="admin-stat-val">1</div>
-            <span style="font-size: 11px; color: var(--text-secondary);">${currentCafe?.name}</span>
-          </div>
-          <div class="admin-stat-card">
-            <small style="color: var(--text-muted);">${window.t('admin_stats_events', 'Agenda Aktif')}</small>
-            <div class="admin-stat-val">${events.length}</div>
-            <span style="font-size: 11px; color: var(--accent-gold);">${window.t('admin_stats_active_badge', 'Aktif di MAMPIR')}</span>
-          </div>
-          <div class="admin-stat-card">
-            <small style="color: var(--text-muted);">${window.t('admin_stats_views', 'Total Interaksi')}</small>
-            <div class="admin-stat-val">1.2k+</div>
-            <span style="font-size: 11px; color: var(--accent-orange);">${window.t('admin_stats_visitors_badge', 'Pengunjung Bulan Ini')}</span>
-          </div>
-        </div>
-
-        <!-- Pilih Kafe yang Dikelola -->
-        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-card); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-          <label style="font-size: 13px; font-weight: bold; white-space: nowrap;">${window.t('admin_select_cafe_label', 'Pilih Kafe Anda:')}</label>
-          <select id="admin-select-cafe" class="form-control" style="flex: 1;" onchange="window.App.switchManagedCafe(this.value)">
-            ${this.places.map(p => `
-              <option value="${p.id}" ${p.id === currentCafe?.id ? 'selected' : ''}>
-                ${p.name} (${p.city})
-              </option>
-            `).join('')}
-          </select>
-        </div>
-
-        <!-- Tabs Navigasi Mitra: Profil & Agenda -->
-        <div class="admin-tab-nav">
-          <button class="admin-tab-btn active" id="tab-btn-profile" onclick="window.App.switchAdminTab('profile')">
-            🏢 ${window.t('admin_tab_profile', 'Profil & Kontak Kafe')}
-          </button>
-          <button class="admin-tab-btn" id="tab-btn-events" onclick="window.App.switchAdminTab('events')">
-            🎉 ${window.t('admin_tab_events', 'Manajemen Agenda & Event')} (${events.length})
-          </button>
-        </div>
-
-        <!-- TAB 1: EDIT PROFIL & KONTAK WHATSAPP KAFE (Req 1 & 2) -->
-        <div id="admin-tab-content-profile">
-          <form onsubmit="event.preventDefault(); window.App.saveCafeProfileChanges('${currentCafe?.id}');" style="display: flex; flex-direction: column; gap: 16px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-              <div class="form-group">
-                <label>${window.t('admin_form_cafe_name', 'Nama Kafe:')}</label>
-                <input type="text" id="admin-cafe-name" class="form-control" value="${currentCafe?.name || ''}" required />
-              </div>
-              <div class="form-group">
-                <label>${window.t('admin_form_wa_label', 'Nomor WhatsApp Pengelola (Format 62xxx):')}</label>
-                <input type="text" id="admin-cafe-wa" class="form-control" value="${currentCafe?.whatsapp || '6281234567890'}" placeholder="Contoh: 6281234567890" required />
-                <small style="font-size: 11px; color: var(--text-muted);">${window.t('admin_form_wa_hint', 'Digunakan untuk tombol langsung "Hubungi Pengelola" (tanpa menampilkan nomor mentah ke pengunjung).')}</small>
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-              <div class="form-group">
-                <label>${window.t('admin_form_region', 'Wilayah:')}</label>
-                <select id="admin-cafe-city" class="form-control">
-                  ${AppConfig.regions.filter(r => !r.includes('Semua')).map(r => `
-                    <option value="${r}" ${r === currentCafe?.city ? 'selected' : ''}>${typeof I18nService !== 'undefined' ? I18nService.translateRegion(r) : r}</option>
-                  `).join('')}
-                </select>
-              </div>
-              <div class="form-group">
-                <label>${window.t('admin_form_hours', 'Jam Operasional:')}</label>
-                <input type="text" id="admin-cafe-hours" class="form-control" value="${currentCafe?.open_hours || '08.00 - 22.00 WIB'}" required />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>${window.t('admin_form_address', 'Alamat Lengkap:')}</label>
-              <input type="text" id="admin-cafe-address" class="form-control" value="${currentCafe?.address || ''}" required />
-            </div>
-
-            <div class="form-group">
-              <label>${window.t('admin_form_desc', 'Deskripsi Kafe:')}</label>
-              <textarea id="admin-cafe-desc" class="form-control" rows="3" required>${currentCafe?.description || ''}</textarea>
-            </div>
-
-            <div class="form-group">
-              <label>${window.t('admin_form_facilities', 'Fasilitas (Pisahkan dengan koma):')}</label>
-              <input type="text" id="admin-cafe-facilities" class="form-control" value="${(currentCafe?.facilities || []).join(', ')}" />
-            </div>
-
-            <button type="submit" class="btn-primary" style="padding: 12px; justify-content: center;">
-              💾 ${window.t('btn_save_changes', 'Simpan Perubahan Profil')}
-            </button>
-          </form>
-        </div>
-
-        <!-- TAB 2: MANAJEMEN AGENDA & EVENT KAFE (Req 2) -->
-        <div id="admin-tab-content-events" style="display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-            <h4 style="font-size: 14px; font-weight: 700;">${window.t('admin_events_list_title', `Daftar Agenda & Promo untuk ${currentCafe?.name}`, { cafe: currentCafe?.name || '' })}</h4>
-            <button class="btn-primary" onclick="window.App.openCreateEventModal('${currentCafe?.id}')">
-              ➕ ${window.t('btn_add_event', 'Tambah Agenda / Promo Baru')}
-            </button>
-          </div>
-
-          <div class="admin-events-list">
-            ${events.length === 0 ? `
-              <div style="padding: 24px; text-align: center; color: var(--text-muted); background: var(--bg-card); border-radius: var(--radius-sm); border: 1px dashed var(--border-color);">
-                ${window.t('admin_events_empty', 'Belum ada agenda atau promo aktif untuk kafe ini. Klik tombol di atas untuk menerbitkan event baru!')}
-              </div>
-            ` : events.map(e => `
-              <div class="cafe-event-card" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
-                <div style="flex: 1;">
-                  <span class="cafe-event-badge">${e.badge || e.category}</span>
-                  <h5 style="font-size: 15px; font-weight: bold; margin: 4px 0;">${e.title}</h5>
-                  <div style="font-size: 12px; color: var(--accent-orange); margin-bottom: 4px;">⏰ ${e.date}</div>
-                  <p style="font-size: 12px; color: var(--text-secondary);">${e.description}</p>
-                </div>
-                <button class="btn-secondary" style="color: #EF4444; padding: 6px 12px; font-size: 12px;" onclick="window.App.deleteEvent('${e.id}')">
-                  🗑️ ${window.t('btn_delete', 'Hapus')}
-                </button>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-    `;
-  },
-
-  switchAdminTab(tabName) {
-    const profContent = document.getElementById('admin-tab-content-profile');
-    const evContent = document.getElementById('admin-tab-content-events');
-    const profBtn = document.getElementById('tab-btn-profile');
-    const evBtn = document.getElementById('tab-btn-events');
-
-    if (tabName === 'profile') {
-      if (profContent) profContent.style.display = 'block';
-      if (evContent) evContent.style.display = 'none';
-      if (profBtn) profBtn.classList.add('active');
-      if (evBtn) evBtn.classList.remove('active');
-    } else {
-      if (profContent) profContent.style.display = 'none';
-      if (evContent) evContent.style.display = 'block';
-      if (profBtn) profBtn.classList.remove('active');
-      if (evBtn) evBtn.classList.add('active');
-    }
-  },
-
-  async handleAdminGateLogin() {
-    const emailEl = document.getElementById('admin-gate-email');
-    const passEl = document.getElementById('admin-gate-password');
-    const errorEl = document.getElementById('admin-gate-error');
-    const btn = document.getElementById('btn-admin-gate-submit');
-    if (!emailEl || !passEl) return;
-
-    const email = emailEl.value.trim().toLowerCase();
-    const pass = passEl.value;
-
-    if (errorEl) errorEl.style.display = 'none';
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = window.t('admin_gate_verifying', 'Memverifikasi Akses Admin...');
-    }
-
-    // 1. Autentikasi kredensial resmi melalui Supabase Auth API
-    const res = await AuthService.signIn(email, pass);
-    if (!res.success) {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = window.t('admin_gate_btn_submit', '🔐 Verifikasi & Buka Panel Admin');
-      }
-      if (errorEl) {
-        errorEl.style.display = 'block';
-        errorEl.textContent = res.message || window.t('admin_gate_err_invalid', '❌ Email atau kata sandi tidak valid.');
-      }
-      return;
-    }
-
-    // 2. Verifikasi hak akses role admin pada backend database Supabase (is_admin RPC / user_profiles)
-    const isAdmin = await AuthService.verifyAdminRole(res.token, res.user?.id);
-    if (!isAdmin) {
-      // Cabut sesi admin jika role akun bukan admin
-      StorageService.setUserRole('user');
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = window.t('admin_gate_btn_submit', '🔐 Verifikasi & Buka Panel Admin');
-      }
-      if (errorEl) {
-        errorEl.style.display = 'block';
-        errorEl.innerHTML = '⛔ <strong>Akses Ditolak:</strong> Akun ini berhasil masuk, namun tidak terdaftar sebagai Administrator pada basis data MAMPIR.';
-      }
-      this.updateUserProfileUI();
-      return;
-    }
-
-    // 3. Hak akses admin terkonfirmasi
-    StorageService.setUserRole('admin');
-    this.updateUserProfileUI();
-    this.render();
-    this.showToast(window.t('toast_admin_login_success', '✅ Otentikasi Administrator Berhasil! Hak akses penuh aktif.'));
-  },
-
-  logoutAdmin() {
-    StorageService.setUserRole('user');
-    this.render();
-    this.showToast(window.t('toast_admin_logout', '🔒 Keluar dari Panel Administrator. Kembali ke mode Pengguna biasa.'));
-  },
-
-  logoutPartner() {
-    this.logoutAdmin();
-  },
-
-  switchManagedCafe(cafeId) {
-    if (!StorageService.isAdmin()) return;
-    StorageService.setUserRole('admin', cafeId);
-    this.render();
-  },
-
-  async saveCafeProfileChanges(cafeId) {
-    if (!StorageService.isAdmin()) {
-      this.showToast(window.t('toast_admin_denied', '⛔ Akses ditolak: Hanya Administrator resmi yang berwenang!'));
-      return;
-    }
-
-    const token = StorageService.getAuthToken();
-    if (!token) {
-      this.showToast('⛔ Sesi otentikasi admin tidak ditemukan. Silakan masuk ulang.');
-      return;
-    }
-
-    const name = document.getElementById('admin-cafe-name')?.value?.trim();
-    const wa = document.getElementById('admin-cafe-wa')?.value?.trim();
-    const city = document.getElementById('admin-cafe-city')?.value;
-    const hours = document.getElementById('admin-cafe-hours')?.value?.trim();
-    const address = document.getElementById('admin-cafe-address')?.value?.trim();
-    const desc = document.getElementById('admin-cafe-desc')?.value?.trim();
-    const facilitiesRaw = document.getElementById('admin-cafe-facilities')?.value;
-    const facilities = facilitiesRaw ? facilitiesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-
-    const saveBtn = document.querySelector('#admin-tab-content-profile button[type="submit"]');
-    if (saveBtn) {
-      saveBtn.disabled = true;
-      saveBtn.textContent = '⏳ Menyimpan ke Supabase...';
-    }
-
-    const payload = {
-      name,
-      city,
-      open_hours: hours,
-      address,
-      description: desc,
-      facilities,
-      override_fields: {
-        name,
-        city,
-        open_hours: hours,
-        address,
-        description: desc,
-        facilities,
-        whatsapp: wa
-      }
-    };
-
-    try {
-      const response = await fetch(`${AppConfig.supabaseUrl}/rest/v1/places?id=eq.${encodeURIComponent(cafeId)}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `HTTP ${response.status}`);
-      }
-
-      // Simpan juga di localStorage sebagai cache sinkron
-      StorageService.saveCafeOverrides(cafeId, payload);
-      const placeIdx = this.places.findIndex(p => p.id === cafeId);
-      if (placeIdx !== -1) {
-        this.places[placeIdx] = {
-          ...this.places[placeIdx],
-          ...payload,
-          whatsapp: wa
-        };
-      }
-
-      this.render();
-      this.showToast(window.t('toast_admin_saved', '✅ Perubahan profil kafe berhasil disimpan ke Supabase!'));
-    } catch (err) {
-      console.error('Gagal sinkron profil kafe ke Supabase:', err);
-      // Fallback simpan di cache lokal
-      StorageService.saveCafeOverrides(cafeId, payload);
-      this.showToast(`⚠️ Gagal sinkron ke database (${err.message}). Data disimpan ke cache lokal.`);
-    } finally {
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = '💾 ' + window.t('btn_save_changes', 'Simpan Perubahan Profil');
-      }
-    }
-  },
-
-  openCreateEventModal(cafeId) {
-    if (!StorageService.isAdmin()) {
-      this.showToast(window.t('toast_admin_denied', '⛔ Akses ditolak: Anda harus masuk sebagai Administrator terlebih dahulu.'));
-      return;
-    }
-
-    const modal = document.getElementById('modal-create-event');
-    const select = document.getElementById('event-input-cafe-id');
-    if (!modal) return;
-
-    if (select) {
-      select.innerHTML = this.places.map(p => `
-        <option value="${p.id}" ${p.id === cafeId ? 'selected' : ''}>${p.name}</option>
-      `).join('');
-    }
-
-    modal.classList.add('active');
-  },
-
-  saveNewEvent() {
-    if (!StorageService.isAdmin()) {
-      this.showToast(window.t('toast_admin_denied', '⛔ Akses ditolak: Hanya Administrator resmi yang berwenang menerbitkan agenda!'));
-      return;
-    }
-
-    const cafeId = document.getElementById('event-input-cafe-id')?.value;
-    const title = document.getElementById('event-input-title')?.value;
-    const category = document.getElementById('event-input-category')?.value;
-    const date = document.getElementById('event-input-date')?.value;
-    const desc = document.getElementById('event-input-desc')?.value;
-    const badge = document.getElementById('event-input-badge')?.value;
-
-    const cafe = this.getPlaceById(cafeId);
-
-    StorageService.addCafeEvent({
-      placeId: cafeId,
-      placeName: cafe?.name || 'Kafe Mitra',
-      title,
-      category,
-      date,
-      description: desc,
-      badge: badge || category
-    });
-
-    const isEn = typeof I18nService !== 'undefined' && I18nService.getLanguage() === 'en';
-    const notifTitle = isEn ? `🎉 New Event: ${title}` : `🎉 Agenda Baru: ${title}`;
-    const notifMsg = isEn
-      ? `${cafe?.name || 'Partner Cafe'} has just posted the event "${title}". Date: ${date}. Check schedule & set reminders!`
-      : `${cafe?.name || 'Kafe Mitra'} baru saja menerbitkan agenda "${title}". Tanggal: ${date}. Cek jadwal dan pasang pengingat!`;
-    const notifDate = window.t('notif_just_now', 'Baru saja');
-
-    // Tambahkan notifikasi real-time untuk semua pengunjung (Req 7)
-    StorageService.addNotification({
-      placeId: cafeId,
-      placeName: cafe?.name || 'Kafe Mitra',
-      title: notifTitle,
-      category: category,
-      type: 'event',
-      message: notifMsg,
-      date: notifDate,
-      read: false
-    });
-    this.updateNotificationBadge();
-
-    this.closeModal('modal-create-event');
-    this.render();
-    this.showToast(window.t('toast_event_published', 'Agenda baru berhasil dipublikasikan!'));
-  },
-
-  deleteEvent(eventId) {
-    if (!StorageService.isAdmin()) {
-      this.showToast(window.t('toast_admin_denied', '⛔ Akses ditolak: Hanya Administrator resmi yang berwenang menghapus agenda!'));
-      return;
-    }
-
-    if (confirm(window.t('confirm_delete_event', 'Yakin ingin menghapus agenda ini?'))) {
-      StorageService.deleteCafeEvent(eventId);
-      this.render();
-      this.showToast(window.t('toast_event_deleted', 'Agenda berhasil dihapus.'));
-    }
   },
 
   handleGuestLogin() {

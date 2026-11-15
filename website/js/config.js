@@ -37,6 +37,15 @@ const AppConfig = {
     zoom: 13
   },
 
+  // Bounding box & radius deteksi GPS Purwokerto dan sekitarnya
+  purwokertoBounds: {
+    minLat: -7.60,
+    maxLat: -7.22,
+    minLng: 109.05,
+    maxLng: 109.42,
+    maxRadiusKm: 28.0
+  },
+
   regions: [
     'Semua Wilayah',
     'Purwokerto Kota',

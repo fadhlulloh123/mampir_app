@@ -5,9 +5,16 @@
  * Terintegrasi penuh dengan I18nService.
  */
 const RecommendationService = {
-  // Titik Alun-Alun Purwokerto
+  // Titik Acuan (Default: Alun-Alun Purwokerto, dapat disinkronkan ke GPS Pengguna)
   CENTER_LAT: -7.4243,
   CENTER_LNG: 109.2303,
+
+  setCenterCoordinates(lat, lng) {
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      this.CENTER_LAT = lat;
+      this.CENTER_LNG = lng;
+    }
+  },
 
   /**
    * Menghitung jarak garis lurus (km) menggunakan Haversine Formula

@@ -1887,72 +1887,6 @@ body {
   gap: 12px;
 }
 
-/* ==================== ADMIN & MITRA DASHBOARD ==================== */
-.admin-dashboard-wrapper {
-  max-width: 850px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.admin-gate-card {
-  padding: 32px 24px;
-  text-align: center;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.admin-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-}
-
-.admin-stat-card {
-  padding: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  text-align: center;
-}
-
-.admin-stat-val {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--accent-orange);
-  margin: 4px 0;
-}
-
-.admin-tab-nav {
-  display: flex;
-  gap: 10px;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 10px;
-}
-
-.admin-tab-btn {
-  padding: 8px 16px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-full);
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.admin-tab-btn.active {
-  background: var(--accent-gradient);
-  color: white;
-  border-color: transparent;
-}
-
 /* ==================== NOTIFICATION CENTER & POPOVER (Req 7) ==================== */
 .notification-wrapper {
   position: relative;
@@ -3072,6 +3006,678 @@ body {
   }
   .fab-roulette {
     padding: 14px;
+  }
+}
+
+/* ==================== GPS GEOLOCATION & GOOGLE MAPS INTEGRATION ==================== */
+.btn-gps-detect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  border-radius: var(--radius-full);
+  color: #3B82F6;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-gps-detect:hover {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: #3B82F6;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-gps-detect.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #1D4ED8;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
+}
+
+.gps-pulse-indicator {
+  width: 8px;
+  height: 8px;
+  background: #10B981;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 6px #10B981;
+}
+
+.btn-gps-detect.detecting .gps-pulse-indicator {
+  background: #F59E0B;
+  box-shadow: 0 0 6px #F59E0B;
+  animation: pulseBlink 0.8s infinite alternate;
+}
+
+.btn-gps-detect.outside .gps-pulse-indicator {
+  background: #F97316;
+  box-shadow: 0 0 6px #F97316;
+}
+
+@keyframes pulseBlink {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+.btn-map-gps {
+  background: #1E293B !important;
+  color: #60A5FA !important;
+  border-color: #3B82F6 !important;
+  font-weight: 700 !important;
+}
+
+.btn-map-gps:hover {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+}
+
+/* User GPS Pulsing Dot Marker on Map */
+.mampir-user-gps-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gps-pulse-wrapper {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gps-dot {
+  width: 14px;
+  height: 14px;
+  background: #2563EB;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
+  z-index: 2;
+}
+
+.gps-pulse-ring {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background: rgba(37, 99, 235, 0.4);
+  border-radius: 50%;
+  animation: gpsPulse 2s infinite ease-out;
+  z-index: 1;
+}
+
+@keyframes gpsPulse {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.badge-google-live {
+  background: #2563EB;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+/* ==================== GOJEK-STYLE NEAR ME (TEMPAT TERDEKAT) ==================== */
+.nearme-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 40px;
+}
+
+.nearme-header-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(245, 124, 0, 0.12), rgba(37, 99, 235, 0.12));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.nearme-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.3px;
+}
+
+.nearme-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.btn-refresh-gps {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.btn-refresh-gps:hover {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+  transform: translateY(-1px);
+}
+
+.btn-refresh-gps.loading .refresh-icon {
+  animation: spinSlow 0.8s linear infinite;
+}
+
+@keyframes spinSlow {
+  100% { transform: rotate(360deg); }
+}
+
+.nearme-location-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nearme-location-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pulse-indicator-dot {
+  width: 12px;
+  height: 12px;
+  background: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10B981;
+  animation: pulseBlink 1.2s infinite alternate;
+  flex-shrink: 0;
+}
+
+.location-label-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.location-name-bold {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.coord-tag {
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--text-muted);
+}
+
+.nearme-test-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.test-chip-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.btn-test-loc-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-test-loc-chip:hover {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+}
+
+.btn-test-loc-chip.active {
+  background: var(--accent-orange);
+  color: #FFFFFF;
+  border-color: var(--accent-orange);
+  font-weight: 700;
+}
+
+.nearme-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.nearme-chips-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px 2px;
+  scrollbar-width: thin;
+}
+
+.chip-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip-filter-item:hover {
+  border-color: var(--accent-orange);
+  transform: translateY(-1px);
+}
+
+.chip-filter-item.active {
+  background: var(--accent-orange);
+  color: #FFFFFF;
+  border-color: var(--accent-orange);
+  box-shadow: 0 4px 12px rgba(245, 124, 0, 0.3);
+}
+
+.nearme-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 4px 2px;
+}
+
+.nearme-results-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.loading-spinner-inline {
+  color: var(--accent-orange);
+  font-size: 11px;
+  margin-left: 8px;
+  font-weight: 700;
+}
+
+.nearme-sort-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.nearme-sort-select {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ==================== GOJEK CARD LIST ==================== */
+.nearme-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gojek-nearme-card {
+  display: flex;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 14px;
+  transition: all 0.25s ease;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.gojek-nearme-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 124, 0, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.card-map-highlight {
+  animation: highlightGojekCard 1.8s ease;
+}
+
+@keyframes highlightGojekCard {
+  0% { box-shadow: 0 0 0 3px #F57C00; border-color: #F57C00; }
+  50% { box-shadow: 0 0 24px rgba(245, 124, 0, 0.6); border-color: #F57C00; }
+  100% { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+}
+
+.gojek-card-media {
+  position: relative;
+  width: 140px;
+  min-width: 140px;
+  height: 125px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.gojek-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.gojek-nearme-card:hover .gojek-card-img {
+  transform: scale(1.05);
+}
+
+.gojek-media-badges {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-cat-pill {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badge-open-now {
+  background: rgba(16, 185, 129, 0.95);
+  backdrop-filter: blur(4px);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badge-closed {
+  background: rgba(239, 68, 68, 0.95);
+  backdrop-filter: blur(4px);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badge-hours {
+  background: rgba(15, 23, 42, 0.85);
+  color: #94A3B8;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gojek-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.gojek-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.gojek-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gojek-card-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.gojek-card-title:hover {
+  color: var(--accent-orange);
+}
+
+.gojek-distance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(245, 124, 0, 0.12);
+  color: var(--accent-orange);
+  border: 1px solid rgba(245, 124, 0, 0.25);
+  padding: 3px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dist-icon {
+  font-size: 12px;
+}
+
+.dist-number {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.gojek-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 4px 0;
+  flex-wrap: wrap;
+}
+
+.gojek-rating-val {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.gojek-dot-divider {
+  color: var(--text-muted);
+}
+
+.gojek-price-range {
+  color: #10B981;
+  font-weight: 700;
+}
+
+.gojek-card-address {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 2px 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gojek-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.btn-gojek-detail {
+  background: var(--accent-orange);
+  color: #FFFFFF;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-gojek-detail:hover {
+  background: #E65100;
+  transform: translateY(-1px);
+}
+
+.btn-gojek-direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-gojek-direction:hover {
+  border-color: #2563EB;
+  color: #2563EB;
+  background: rgba(37, 99, 235, 0.05);
+  transform: translateY(-1px);
+}
+
+.btn-gojek-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-gojek-map:hover {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+}
+
+.nearme-empty-card {
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 40px 20px;
+}
+
+.nearme-empty-card .empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.nearme-empty-card .empty-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.nearme-empty-card .empty-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 420px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .gojek-nearme-card {
+    flex-direction: column;
+  }
+  .gojek-card-media {
+    width: 100%;
+    height: 160px;
   }
 }
 
