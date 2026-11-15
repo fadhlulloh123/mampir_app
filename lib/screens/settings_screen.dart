@@ -1,6 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../services/preference_service.dart';
+import '../services/profile_photo_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/profile_photo_editor_dialog.dart';
 import 'login_screen.dart';
 
 /// ============================================================
@@ -17,8 +20,14 @@ import 'login_screen.dart';
 class SettingsScreen extends StatefulWidget {
   final bool isRootTab;
   final String? currentRegion;
+  final ProfilePhotoService? photoService;
 
-  const SettingsScreen({super.key, this.isRootTab = false, this.currentRegion});
+  const SettingsScreen({
+    super.key,
+    this.isRootTab = false,
+    this.currentRegion,
+    this.photoService,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -30,10 +39,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _userName = 'Penjelajah MAMPIR';
   String _userEmail = 'user@mampir.id';
   String _userBadge = '🌟 Penjelajah Purwokerto';
+  Uint8List? _userPhotoBytes;
   bool _isGuest = false;
   bool _isNotificationEnabled = true;
   bool _isLocationEnabled = true;
   String _selectedTheme = 'Gelap';
+
+  ProfilePhotoService get _photoService =>
+      widget.photoService ?? ProfilePhotoService();
 
   @override
   void initState() {
@@ -65,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       email = await _prefService.getUserEmail();
     }
 
+    final photoBytes = await _prefService.getUserPhotoBytes();
     final notif = await _prefService.isNotificationEnabled();
     final loc = await _prefService.isLocationEnabled();
     final theme = await _prefService.getThemeMode();
@@ -75,11 +89,354 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _userName = name;
         _userEmail = email;
         _userBadge = badge;
+        _userPhotoBytes = photoBytes;
         _isNotificationEnabled = notif;
         _isLocationEnabled = loc;
         _selectedTheme = theme;
       });
     }
+  }
+
+  Future<void> _importAndEditPhoto() async {
+    final pickResult = await _photoService.pickFromLocalFolder();
+    if (!mounted) return;
+    if (pickResult.cancelled) return;
+
+    if (!pickResult.hasImage) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            pickResult.errorMessage ?? 'Gagal mengimpor gambar dari folder lokal.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final editedBytes = await ProfilePhotoEditorDialog.show(
+      context,
+      imageBytes: pickResult.bytes!,
+      title: _userPhotoBytes == null
+          ? 'Tambah Foto Profil'
+          : 'Ubah Foto Profil',
+    );
+    if (editedBytes == null || !mounted) return;
+
+    await _prefService.saveUserPhotoBytes(editedBytes);
+    if (!mounted) return;
+    setState(() => _userPhotoBytes = editedBytes);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Foto profil berhasil disimpan ✨'),
+        backgroundColor: Colors.green.shade700,
+      ),
+    );
+  }
+
+  Future<void> _editCurrentPhoto() async {
+    final current = _userPhotoBytes;
+    if (current == null) {
+      await _importAndEditPhoto();
+      return;
+    }
+
+    final editedBytes = await ProfilePhotoEditorDialog.show(
+      context,
+      imageBytes: current,
+      title: 'Edit Foto Profil',
+    );
+    if (editedBytes == null || !mounted) return;
+
+    await _prefService.saveUserPhotoBytes(editedBytes);
+    if (!mounted) return;
+    setState(() => _userPhotoBytes = editedBytes);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Foto profil berhasil diperbarui ✨'),
+        backgroundColor: Colors.green.shade700,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeletePhoto() async {
+    if (_userPhotoBytes == null) return;
+    final colors = AppTheme.colors(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colors.surfaceNavy,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.delete_outline_rounded,
+              color: Colors.redAccent,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Hapus Foto Profil',
+              style: TextStyle(color: colors.textPrimary, fontSize: 18),
+            ),
+          ],
+        ),
+        content: Text(
+          'Foto profil akan dihapus dan dikembalikan ke avatar inisial default. Lanjutkan?',
+          style: TextStyle(color: colors.textSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal', style: TextStyle(color: colors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await _prefService.deleteUserPhoto();
+    if (!mounted) return;
+    setState(() => _userPhotoBytes = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Foto profil berhasil dihapus'),
+        backgroundColor: AppTheme.orange,
+      ),
+    );
+  }
+
+  void _showProfilePhotoOptions() {
+    final colors = AppTheme.colors(context);
+    final hasPhoto = _userPhotoBytes != null;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surfaceNavy,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.borderNavy,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _buildProfileAvatar(size: 52),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Kelola Foto Profil',
+                            style: TextStyle(
+                              color: colors.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            hasPhoto
+                                ? 'Ubah, edit tampilan, atau hapus foto profil Anda'
+                                : 'Impor gambar dari folder lokal perangkat',
+                            style: TextStyle(
+                              color: colors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(color: colors.borderNavy, height: 1),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.folder_open_rounded,
+                    color: AppTheme.orange,
+                  ),
+                  title: Text(
+                    hasPhoto
+                        ? 'Ubah Foto dari Folder Lokal'
+                        : 'Tambah Foto dari Folder Lokal',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Impor file gambar (JPG, PNG, WEBP) dari penyimpanan lokal',
+                    style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    _importAndEditPhoto();
+                  },
+                ),
+                if (hasPhoto) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      Icons.tune_rounded,
+                      color: AppTheme.gold,
+                    ),
+                    title: Text(
+                      'Edit Foto Saat Ini',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Crop, zoom, putar, balik, dan atur filter warna',
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _editCurrentPhoto();
+                    },
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                    ),
+                    title: const Text(
+                      'Hapus Foto Profil',
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Kembali ke avatar inisial default',
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _confirmDeletePhoto();
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileAvatar({
+    required double size,
+    bool showCameraBadge = false,
+  }) {
+    final photo = _userPhotoBytes;
+    final avatarCircle = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: photo == null ? AppTheme.primaryGradient : null,
+        shape: BoxShape.circle,
+        border: photo != null
+            ? Border.all(color: AppTheme.orange, width: 2)
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.orange.withAlpha(80),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: photo != null
+            ? Image.memory(
+                photo,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (ctx, err, st) => _buildInitialAvatarChild(size),
+              )
+            : _buildInitialAvatarChild(size),
+      ),
+    );
+
+    if (!showCameraBadge) return avatarCircle;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        avatarCircle,
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: AppTheme.orange,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppTheme.colors(context).cardNavy, width: 2),
+            ),
+            child: const Icon(
+              Icons.camera_alt_rounded,
+              color: Colors.white,
+              size: 11,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInitialAvatarChild(double size) {
+    return Container(
+      decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+      alignment: Alignment.center,
+      child: Text(
+        _userName.isNotEmpty ? _userName[0].toUpperCase() : 'M',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size * 0.4,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 
   void _showEditProfileDialog() {
@@ -89,91 +446,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: colors.surfaceNavy,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Edit Profil Pengguna',
-          style: TextStyle(
-            color: colors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              style: TextStyle(color: colors.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Nama Pengguna',
-                labelStyle: const TextStyle(color: AppTheme.gold),
-                filled: true,
-                fillColor: colors.cardNavy,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: colors.borderNavy),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: colors.borderNavy),
-                ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: colors.surfaceNavy,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Edit Profil Pengguna',
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: emailCtrl,
-              style: TextStyle(color: colors.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Email',
-                labelStyle: const TextStyle(color: AppTheme.gold),
-                filled: true,
-                fillColor: colors.cardNavy,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: colors.borderNavy),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: colors.borderNavy),
-                ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      await _importAndEditPhoto();
+                      if (dialogCtx.mounted) setDialogState(() {});
+                    },
+                    child: _buildProfileAvatar(size: 72, showCameraBadge: true),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () async {
+                          await _importAndEditPhoto();
+                          if (dialogCtx.mounted) setDialogState(() {});
+                        },
+                        icon: const Icon(
+                          Icons.folder_open_rounded,
+                          size: 16,
+                          color: AppTheme.orange,
+                        ),
+                        label: Text(
+                          _userPhotoBytes == null ? 'Impor Foto' : 'Ubah Foto',
+                          style: const TextStyle(
+                            color: AppTheme.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (_userPhotoBytes != null) ...[
+                        TextButton.icon(
+                          onPressed: () async {
+                            await _editCurrentPhoto();
+                            if (dialogCtx.mounted) setDialogState(() {});
+                          },
+                          icon: const Icon(
+                            Icons.tune_rounded,
+                            size: 16,
+                            color: AppTheme.gold,
+                          ),
+                          label: const Text(
+                            'Edit',
+                            style: TextStyle(
+                              color: AppTheme.gold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            await _confirmDeletePhoto();
+                            if (dialogCtx.mounted) setDialogState(() {});
+                          },
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 16,
+                            color: Colors.redAccent,
+                          ),
+                          label: const Text(
+                            'Hapus',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameCtrl,
+                    style: TextStyle(color: colors.textPrimary, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Nama Pengguna',
+                      labelStyle: const TextStyle(color: AppTheme.gold),
+                      filled: true,
+                      fillColor: colors.cardNavy,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: colors.borderNavy),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: colors.borderNavy),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: emailCtrl,
+                    style: TextStyle(color: colors.textPrimary, fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      labelStyle: const TextStyle(color: AppTheme.gold),
+                      filled: true,
+                      fillColor: colors.cardNavy,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: colors.borderNavy),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: colors.borderNavy),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Batal', style: TextStyle(color: colors.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.orange,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Batal',
+                  style: TextStyle(color: colors.textSecondary),
+                ),
               ),
-            ),
-            onPressed: () async {
-              final newName = nameCtrl.text.trim();
-              final newEmail = emailCtrl.text.trim();
-              Navigator.pop(ctx);
-              if (newName.isNotEmpty) {
-                await _prefService.updateProfile(
-                  name: newName,
-                  email: newEmail,
-                );
-                if (mounted) {
-                  setState(() {
-                    _userName = newName;
-                    _userEmail = newEmail;
-                  });
-                }
-              }
-            },
-            child: const Text('Simpan', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.orange,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () async {
+                  final newName = nameCtrl.text.trim();
+                  final newEmail = emailCtrl.text.trim();
+                  Navigator.pop(ctx);
+                  if (newName.isNotEmpty) {
+                    await _prefService.updateProfile(
+                      name: newName,
+                      email: newEmail,
+                    );
+                    if (mounted) {
+                      setState(() {
+                        _userName = newName;
+                        _userEmail = newEmail;
+                      });
+                    }
+                  }
+                },
+                child: const Text(
+                  'Simpan',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -395,29 +841,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       child: Row(
         children: [
-          // Avatar Lingkaran
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.orange.withAlpha(80),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              _userName.isNotEmpty ? _userName[0].toUpperCase() : 'M',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+          // Avatar Lingkaran (Ketuk untuk Tambah/Ubah/Edit/Hapus Foto)
+          Tooltip(
+            message: 'Kelola Foto Profil',
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _showProfilePhotoOptions,
+              child: _buildProfileAvatar(size: 56, showCameraBadge: true),
             ),
           ),
           const SizedBox(width: 14),
@@ -468,7 +898,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
 
-          // Tombol Edit Profil
+          // Tombol Kelola Foto & Edit Profil
+          IconButton(
+            icon: const Icon(
+              Icons.photo_camera_outlined,
+              color: AppTheme.orange,
+              size: 20,
+            ),
+            tooltip: 'Kelola Foto Profil',
+            onPressed: _showProfilePhotoOptions,
+          ),
           if (!_isGuest)
             IconButton(
               icon: const Icon(

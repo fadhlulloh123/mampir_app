@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// ============================================================
@@ -32,6 +33,7 @@ class PreferenceService {
   static const String keyIsGuest = 'is_guest_mode';
   static const String keyUserName = 'user_name';
   static const String keyUserEmail = 'user_email';
+  static const String keyUserPhoto = 'user_profile_photo';
 
   // Settings Keys
   static const String keyNotificationEnabled = 'setting_notification_enabled';
@@ -190,6 +192,35 @@ class PreferenceService {
     await prefs.setString(keyUserEmail, email);
   }
 
+  /// Ambil bytes foto profil pengguna yang tersimpan lokal (null jika belum ada / korup)
+  Future<Uint8List?> getUserPhotoBytes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(keyUserPhoto);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = base64Decode(raw);
+      return decoded.isEmpty ? null : decoded;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Simpan atau perbarui foto profil pengguna dari bytes gambar
+  Future<void> saveUserPhotoBytes(Uint8List bytes) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (bytes.isEmpty) {
+      await prefs.remove(keyUserPhoto);
+      return;
+    }
+    await prefs.setString(keyUserPhoto, base64Encode(bytes));
+  }
+
+  /// Hapus foto profil pengguna sehingga kembali ke avatar inisial default
+  Future<void> deleteUserPhoto() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(keyUserPhoto);
+  }
+
   /// Logout pengguna
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
@@ -197,6 +228,7 @@ class PreferenceService {
     await prefs.setBool(keyIsGuest, false);
     await prefs.remove(keyUserName);
     await prefs.remove(keyUserEmail);
+    await prefs.remove(keyUserPhoto);
   }
 
   // ======================== USER BUDGET ========================
