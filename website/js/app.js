@@ -866,15 +866,6 @@ window.App = {
     const distance = RecommendationService.calculateDistance(place.latitude, place.longitude);
     const catLabel = typeof I18nService !== 'undefined' ? I18nService.translateCategory(place.category) : place.category;
 
-    // Format Link WhatsApp Resmi Pengelola Kafe (Req 1)
-    const rawPhone = place.whatsapp || '6281234567890';
-    const cleanPhone = rawPhone.replace(/\D/g, '');
-    const isEn = typeof I18nService !== 'undefined' && I18nService.getLanguage() === 'en';
-    const waGreeting = isEn
-      ? `Hello Admin ${place.name}, I found your cafe through MAMPIR and would like to ask:`
-      : `Halo Admin ${place.name}, saya menemukan kafe Anda melalui Mampir dan ingin bertanya:`;
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waGreeting)}`;
-
     // Agenda / Event Kafe Aktif (Req 2)
     const cafeEvents = StorageService.getCafeEvents(place.id);
 
@@ -912,23 +903,15 @@ window.App = {
         <div><small style="color: var(--text-muted);">${window.t('open_hours_label', 'Jam Operasional')}</small><div style="font-weight: bold;">${place.open_hours || '08.00 - 22.00'}</div></div>
       </div>
 
-      <!-- Tombol Aksi: WhatsApp Kontak Pengelola (Req 1) & Google Maps -->
+      <!-- Tombol Aksi Navigasi Google Maps -->
       <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-        <!-- Tombol CTA WhatsApp Pengelola (Tanpa Nomor Mentah di Layar) -->
-        <a href="${waUrl}" target="_blank" class="btn-cta-whatsapp" style="flex: 1; min-width: 220px;" title="${window.t('btn_contact_wa', 'Hubungi Pengelola')}">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.04-1.077-.077-.738-.225-1.745-.732-2.839-1.826-1.094-1.094-1.601-2.101-1.826-2.839-.117-.383-.122-.765-.077-1.077.05-.333.419-1.026.824-1.17.203-.072.396-.062.54.021.162.093.522.86.567.971.045.111.072.24.009.366-.063.126-.135.216-.243.342-.108.126-.216.27-.306.378-.108.126-.225.261-.099.477.126.216.558.918 1.206 1.494.837.747 1.548.981 1.764 1.089.216.108.342.09.468-.054.126-.144.54-.63.684-.846.144-.216.288-.18.495-.108.207.072 1.323.624 1.548.738.225.114.378.171.432.27.054.099.054.576-.09 1.053z"/>
-            <path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.18-1.31C8.61 21.49 10.26 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.62 0-3.13-.48-4.4-1.31l-.31-.2-3.26.83.85-3.18-.22-.35C3.78 14.65 3.3 13.37 3.3 12c0-4.8 3.9-8.7 8.7-8.7s8.7 3.9 8.7 8.7-3.9 8.7-8.7 8.7z"/>
-          </svg>
-          <span>${window.t('btn_contact_wa', 'Hubungi Pengelola')}</span>
-        </a>
         <a href="${(this.userGps && this.userGps.lat) ? `https://www.google.com/maps/dir/?api=1&origin=${this.userGps.lat},${this.userGps.lng}&destination=${place.latitude},${place.longitude}` : `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`}" target="_blank"
-           class="btn-primary" style="flex: 1; min-width: 200px; text-align: center; text-decoration: none; justify-content: center;">
+           class="btn-primary" style="flex: 1; min-width: 220px; text-align: center; text-decoration: none; justify-content: center; padding: 12px 18px; font-size: 14px; font-weight: 700;">
           🗺️ ${window.t('route_btn', 'Buka Rute di Google Maps')}
         </a>
         ${place.googleMapsUri ? `
           <a href="${place.googleMapsUri}" target="_blank"
-             class="btn-secondary" style="font-size: 13px; padding: 10px 16px; text-decoration: none; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+             class="btn-secondary" style="font-size: 13px; padding: 12px 18px; text-decoration: none; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
             📍 Google Maps Profile
           </a>
         ` : ''}
@@ -1909,11 +1892,11 @@ window.App = {
           : 'Anda dapat menentukan batas anggaran per orang dari Rp 10.000 hingga Rp 100.000 melalui tombol "Filter Budget". Tempat yang rata-rata harganya sesuai atau di bawah anggaran Anda akan diprioritaskan dengan skor rekomendasi lebih tinggi dan badge hemat.'
       },
       {
-        cat: 'contact',
-        q: isEn ? 'How do I contact cafe managers directly?' : 'Bagaimana cara menghubungi pengelola kafe secara langsung?',
+        cat: 'navigation',
+        q: isEn ? 'How do I open route directions to a cafe?' : 'Bagaimana cara membuka petunjuk rute ke kafe?',
         a: isEn
-          ? 'Open any cafe detail modal, then click the green "Contact Manager" button. You will be directed straight to the manager’s official WhatsApp chat with an automated greeting without exposing private phone numbers.'
-          : 'Buka modal detail kafe mana saja, lalu klik tombol hijau "Hubungi Pengelola". Anda akan langsung diarahkan ke chat WhatsApp resmi admin kafe tersebut dengan pesan pembuka otomatis tanpa menampilkan nomor pribadi secara terbuka.'
+          ? 'Open any cafe detail modal and click the orange "Open Route on Google Maps" button. You will be directed straight to Google Maps turn-by-turn navigation from your current location.'
+          : 'Buka modal detail kafe mana saja, lalu klik tombol oranye "Buka Rute di Google Maps". Anda akan langsung diarahkan ke navigasi rute turn-by-turn di Google Maps dari lokasi Anda saat ini.'
       },
       {
         cat: 'partner',

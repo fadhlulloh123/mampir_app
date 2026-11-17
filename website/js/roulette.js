@@ -866,14 +866,6 @@ const RouletteController = {
       ? I18nService.translateCategory(winner.category || 'Cafe')
       : (winner.category || 'Cafe');
 
-    const rawPhone = winner.whatsapp || '6281234567890';
-    const cleanPhone = rawPhone.replace(/\D/g, '');
-    const isEn = typeof I18nService !== 'undefined' && I18nService.getLanguage() === 'en';
-    const waText = isEn
-      ? `Hello Admin ${winner.name}, your cafe was selected as Today's Best Pick on MAMPIR Roulette! I would like to ask:`
-      : `Halo Admin ${winner.name}, kafe Anda terpilih sebagai Rekomendasi Utama Hari Ini di MAMPIR Roulette! Saya ingin bertanya:`;
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`;
-
     cardContainer.innerHTML = `
       <div class="winner-hero-card">
         <div class="winner-badge-ribbon">
@@ -915,17 +907,10 @@ const RouletteController = {
         </div>
 
         <!-- Tombol Aksi Lanjutan -->
-        <div class="winner-actions-grid">
+        <div class="winner-actions-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <button class="btn-primary" onclick="window.Roulette.focusOnMap('${winner.id}', ${winner.latitude}, ${winner.longitude})">
             ${window.t('wheel_action_route', '🗺️ Buka Rute di Peta')}
           </button>
-          <a href="${waUrl}" target="_blank" class="btn-cta-whatsapp" style="text-decoration: none; justify-content: center;">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-              <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.04-1.077-.077-.738-.225-1.745-.732-2.839-1.826-1.094-1.094-1.601-2.101-1.826-2.839-.117-.383-.122-.765-.077-1.077.05-.333.419-1.026.824-1.17.203-.072.396-.062.54.021.162.093.522.86.567.971.045.111.072.24.009.366-.063.126-.135.216-.243.342-.108.126-.216.27-.306.378-.108.126-.225.261-.099.477.126.216.558.918 1.206 1.494.837.747 1.548.981 1.764 1.089.216.108.342.09.468-.054.126-.144.54-.63.684-.846.144-.216.288-.18.495-.108.207.072 1.323.624 1.548.738.225.114.378.171.432.27.054.099.054.576-.09 1.053z"/>
-              <path d="M12 2C6.48 2 2 6.48 2 12c0 1.82.49 3.53 1.34 5L2 22l5.18-1.31C8.61 21.49 10.26 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.62 0-3.13-.48-4.4-1.31l-.31-.2-3.26.83.85-3.18-.22-.35C3.78 14.65 3.3 13.37 3.3 12c0-4.8 3.9-8.7 8.7-8.7s8.7 3.9 8.7 8.7-3.9 8.7-8.7 8.7z"/>
-            </svg>
-            <span>${window.t('wheel_action_wa', 'Chat Pengelola via WhatsApp')}</span>
-          </a>
           <button class="btn-secondary" onclick="window.Roulette.switchToView('setup')">
             ${window.t('wheel_action_spin_again', '🔄 Putar Ulang / Ganti Pilihan')}
           </button>
