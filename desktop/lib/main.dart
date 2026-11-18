@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -33,6 +34,172 @@ class AdminApp extends StatelessWidget {
   );
 }
 
+enum OrnamentOrigin {
+  topRight,
+  bottomLeft,
+  topLeft,
+  bottomRight,
+}
+
+class MandalaOrnamentPainter extends CustomPainter {
+  final double scale;
+  final bool isDark;
+  final double strokeWidth;
+  final Color? color;
+  final OrnamentOrigin origin;
+
+  MandalaOrnamentPainter({
+    this.scale = 1.0,
+    required this.isDark,
+    this.strokeWidth = 1.2,
+    this.color,
+    this.origin = OrnamentOrigin.topRight,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final effectiveColor = color ??
+        (isDark
+            ? const Color(0xFFFFB74D).withValues(alpha: 0.16)
+            : const Color(0xFFD97706).withValues(alpha: 0.20));
+
+    final paint = Paint()
+      ..color = effectiveColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    final fillPaint = Paint()
+      ..color = effectiveColor.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+
+    late Offset center;
+    switch (origin) {
+      case OrnamentOrigin.topRight:
+        center = Offset(size.width, 0);
+        break;
+      case OrnamentOrigin.bottomLeft:
+        center = Offset(0, size.height);
+        break;
+      case OrnamentOrigin.topLeft:
+        center = const Offset(0, 0);
+        break;
+      case OrnamentOrigin.bottomRight:
+        center = Offset(size.width, size.height);
+        break;
+    }
+
+    final maxRadius = size.width * 0.78 * scale;
+    const int petals = 12;
+
+    for (double r = 36; r <= maxRadius; r += 28) {
+      canvas.drawCircle(center, r, paint);
+    }
+
+    for (int i = 0; i < petals; i++) {
+      final angle = (i * 2 * math.pi) / petals;
+      final midR = maxRadius * 0.58;
+      final x = center.dx + math.cos(angle) * midR;
+      final y = center.dy + math.sin(angle) * midR;
+
+      canvas.drawCircle(Offset(x, y), 22 * scale, paint);
+
+      final rx = center.dx + math.cos(angle) * maxRadius;
+      final ry = center.dy + math.sin(angle) * maxRadius;
+      canvas.drawLine(center, Offset(rx, ry), paint);
+
+      canvas.drawCircle(Offset(rx, ry), 2.5 * scale, fillPaint);
+    }
+
+    final innerR = maxRadius * 0.32;
+    for (int i = 0; i < petals; i++) {
+      final angle = (i * 2 * math.pi) / petals + (math.pi / petals);
+      final x = center.dx + math.cos(angle) * innerR;
+      final y = center.dy + math.sin(angle) * innerR;
+      canvas.drawCircle(Offset(x, y), 14 * scale, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant MandalaOrnamentPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.scale != scale ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.origin != origin;
+  }
+}
+
+class FloatingBatikAccentPainter extends CustomPainter {
+  final bool isDark;
+  final double strokeWidth;
+
+  FloatingBatikAccentPainter({required this.isDark, this.strokeWidth = 1.6});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final baseColor =
+        isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309);
+    final double opacity = isDark ? 0.16 : 0.22;
+
+    final strokePaint = Paint()
+      ..color = baseColor.withValues(alpha: opacity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    final fillPaint = Paint()
+      ..color = baseColor.withValues(alpha: opacity * 0.6)
+      ..style = PaintingStyle.fill;
+
+    final List<Offset> points = [
+      Offset(size.width * 0.14, size.height * 0.22),
+      Offset(size.width * 0.88, size.height * 0.28),
+      Offset(size.width * 0.18, size.height * 0.75),
+      Offset(size.width * 0.84, size.height * 0.78),
+      Offset(size.width * 0.50, size.height * 0.08),
+    ];
+
+    for (int i = 0; i < points.length; i++) {
+      final pt = points[i];
+      final double r = (i % 2 == 0) ? 14.0 : 10.0;
+
+      final path = Path();
+      path.moveTo(pt.dx, pt.dy - r);
+      path.quadraticBezierTo(
+        pt.dx + r * 0.25,
+        pt.dy - r * 0.25,
+        pt.dx + r,
+        pt.dy,
+      );
+      path.quadraticBezierTo(
+        pt.dx + r * 0.25,
+        pt.dy + r * 0.25,
+        pt.dx,
+        pt.dy + r,
+      );
+      path.quadraticBezierTo(
+        pt.dx - r * 0.25,
+        pt.dy + r * 0.25,
+        pt.dx - r,
+        pt.dy,
+      );
+      path.quadraticBezierTo(
+        pt.dx - r * 0.25,
+        pt.dy - r * 0.25,
+        pt.dx,
+        pt.dy - r,
+      );
+      path.close();
+
+      canvas.drawPath(path, strokePaint);
+      canvas.drawCircle(pt, 2.2, fillPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant FloatingBatikAccentPainter oldDelegate) =>
+      oldDelegate.isDark != isDark || oldDelegate.strokeWidth != strokeWidth;
+}
+
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});
   @override
@@ -46,6 +213,13 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   bool obscurePassword = true;
   bool rememberMe = false;
   String? error;
+
+  static const Color _amberPrimary = Color(0xFFD99B25);
+  static const Color _navyBg = Color(0xFF0D1326);
+  static const Color _navyCard = Color(0xFF162035);
+  static const Color _navySurface = Color(0xFF1A233A);
+  static const Color _navyInput = Color(0xFF131B30);
+  static const Color _navyBorder = Color(0xFF263353);
 
   @override
   void initState() {
@@ -101,6 +275,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       loading = true;
       error = null;
     });
+
     try {
       final response = await http.post(
         Uri.parse('$supabaseUrl/auth/v1/token?grant_type=password'),
@@ -113,16 +288,21 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
           'password': cleanPassword,
         }),
       );
+
       if (response.statusCode != 200) {
         throw Exception('Email atau kata sandi admin tidak valid.');
       }
+
       final token =
           (jsonDecode(response.body) as Map<String, dynamic>)['access_token']
               as String?;
+
       if (token == null || token.isEmpty) {
         throw Exception('Token login tidak tersedia.');
       }
+
       await _saveCredentials();
+
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => AdminDashboard(token: token)),
@@ -136,614 +316,439 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     }
   }
 
-  static const Color _amberPrimary = Color(0xFFD99B25);
-  static const Color _amberDark = Color(0xFFB57D18);
-  static const Color _darkSurface = Color(0xFF131316);
-  static const Color _darkInput = Color(0xFF24242C);
-  static const Color _brandDark = Color(0xFF1E1303);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _darkSurface,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 900;
-          if (isWide) {
-            return Row(
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: _buildBrandingPanel(),
-                ),
-                Expanded(
-                  flex: 6,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 48,
-                        vertical: 32,
-                      ),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 440),
-                        child: _buildLoginForm(context),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildCompactBrandingBanner(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 32,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    child: _buildLoginForm(context),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildBrandingPanel() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFFF2B039),
-            _amberPrimary,
-            _amberDark,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 48),
-      child: Stack(
+      backgroundColor: _navyBg,
+      body: Stack(
         children: [
+          // 1. Ornamen Mandala Kanan Atas
           Positioned(
-            right: -60,
-            top: -60,
-            child: Container(
-              width: 240,
-              height: 240,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
+            top: 0,
+            right: 0,
+            width: 360,
+            height: 360,
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: MandalaOrnamentPainter(
+                  scale: 1.1,
+                  isDark: true,
+                  origin: OrnamentOrigin.topRight,
+                ),
               ),
             ),
           ),
+
+          // 2. Ornamen Mandala Kiri Bawah
           Positioned(
-            left: -80,
-            bottom: -60,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black.withValues(alpha: 0.06),
+            bottom: 0,
+            left: 0,
+            width: 320,
+            height: 320,
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: MandalaOrnamentPainter(
+                  scale: 0.95,
+                  isDark: true,
+                  origin: OrnamentOrigin.bottomLeft,
+                ),
               ),
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.18),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.asset(
-                      'assets/images/app_icon.jpeg',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: const Color(0xFF231805),
-                        child: const Icon(
-                          Icons.travel_explore_rounded,
-                          color: Color(0xFFF3B43F),
-                          size: 26,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'MAMPIR',
-                        style: TextStyle(
-                          color: _brandDark,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 22,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      Text(
-                        'PORTAL ADMINISTRASI',
-                        style: TextStyle(
-                          color: Color(0xFF4A3410),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+
+          // 3. Aksen Corak Bunga Batik Floating
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: FloatingBatikAccentPainter(isDark: true),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
+            ),
+          ),
+
+          // 4. Soft Glow di Belakang Kartu
+          Center(
+            child: Container(
+              width: 520,
+              height: 520,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    _amberPrimary.withValues(alpha: 0.10),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 5. Kartu Login di Tengah Layar (Scrollable, Tidak Ada Bug Overflow)
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      color: _brandDark,
+                      color: _navyCard,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: _navyBorder,
+                        width: 1.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.22),
+                          color: Colors.black.withValues(alpha: 0.45),
+                          blurRadius: 36,
+                          offset: const Offset(0, 14),
+                        ),
+                        BoxShadow(
+                          color: _amberPrimary.withValues(alpha: 0.08),
                           blurRadius: 20,
-                          offset: const Offset(0, 8),
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(4),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Image.asset(
-                        'assets/images/app_icon.jpeg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                          Icons.travel_explore_rounded,
-                          color: Color(0xFFF3B43F),
-                          size: 46,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 36,
+                      vertical: 36,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // TEPAT 1 LOGO MAMPIR (Tanpa Duplikasi)
+                        Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            color: _navySurface,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: _amberPrimary, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _amberPrimary.withValues(alpha: 0.35),
+                                blurRadius: 18,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Transform.scale(
+                              scale: 1.35,
+                              alignment: const Alignment(0, -0.04),
+                              child: Image.asset(
+                                'assets/images/app_icon.jpeg',
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(
+                                  Icons.travel_explore_rounded,
+                                  size: 38,
+                                  color: _amberPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Kelola Informasi,\nRute, & Komunitas.',
-                    style: TextStyle(
-                      color: _brandDark,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      height: 1.2,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Pusat kendali operasional platform MAMPIR untuk kurasi destinasi kuliner dan wisata, moderasi ulasan, serta sinkronisasi data tempat secara real-time.',
-                    style: TextStyle(
-                      color: const Color(0xFF2E1C05).withValues(alpha: 0.85),
-                      fontSize: 14,
-                      height: 1.6,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  _buildBrandingFeatureItem(
-                    Icons.map_rounded,
-                    'Manajemen Tempat & Rute Wisata',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildBrandingFeatureItem(
-                    Icons.category_rounded,
-                    'Kelola Kategori & Ulasan Komunitas',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildBrandingFeatureItem(
-                    Icons.sync_rounded,
-                    'Sinkronisasi Google API & Supabase',
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: _brandDark,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Mampir Admin Suite • Proyek PML 2026',
-                    style: TextStyle(
-                      color: const Color(0xFF2E1C05).withValues(alpha: 0.75),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+                        const SizedBox(height: 16),
 
-  Widget _buildBrandingFeatureItem(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: _brandDark.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _brandDark.withValues(alpha: 0.12),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: _brandDark),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: _brandDark,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactBrandingBanner() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_amberPrimary, _amberDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: _brandDark,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Image.asset(
-              'assets/images/app_icon.jpeg',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.travel_explore_rounded,
-                color: Color(0xFFF3B43F),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'MAMPIR ADMIN',
-                style: TextStyle(
-                  color: _brandDark,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              Text(
-                'Portal Manajemen Administrator',
-                style: TextStyle(
-                  color: Color(0xFF382307),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoginForm(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: _amberPrimary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _amberPrimary.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.shield_rounded, size: 14, color: _amberPrimary),
-              SizedBox(width: 6),
-              Text(
-                'Akses Terbatas Admin',
-                style: TextStyle(
-                  color: _amberPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'Selamat Datang Kembali 👋',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Silakan masukkan kredensial administrator Anda untuk mengelola data sistem MAMPIR.',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.white.withValues(alpha: 0.65),
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 28),
-        if (error != null) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7F1D1D).withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.6),
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.error_outline_rounded,
-                  color: Color(0xFFFCA5A5),
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    error!,
-                    style: const TextStyle(
-                      color: Color(0xFFFCA5A5),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-        const Text(
-          'Email Administrator',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: email,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: 'admin@mampir.id',
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-            prefixIcon: const Icon(
-              Icons.email_outlined,
-              color: Colors.white54,
-              size: 20,
-            ),
-            filled: true,
-            fillColor: _darkInput,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-              borderSide: BorderSide(color: _amberPrimary, width: 1.5),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        const Text(
-          'Kata Sandi',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: password,
-          obscureText: obscurePassword,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          onSubmitted: (_) => loading ? null : login(),
-          decoration: InputDecoration(
-            hintText: '••••••••',
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-            prefixIcon: const Icon(
-              Icons.lock_outline_rounded,
-              color: Colors.white54,
-              size: 20,
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscurePassword
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: Colors.white54,
-                size: 20,
-              ),
-              onPressed: () =>
-                  setState(() => obscurePassword = !obscurePassword),
-            ),
-            filled: true,
-            fillColor: _darkInput,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-              borderSide: BorderSide(color: _amberPrimary, width: 1.5),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            SizedBox(
-              height: 24,
-              width: 24,
-              child: Checkbox(
-                value: rememberMe,
-                activeColor: _amberPrimary,
-                checkColor: _brandDark,
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                onChanged: (val) {
-                  setState(() => rememberMe = val ?? false);
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => setState(() => rememberMe = !rememberMe),
-              child: Text(
-                'Ingat saya di perangkat ini',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.75),
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            onPressed: loading ? null : login,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _amberPrimary,
-              foregroundColor: _brandDark,
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: loading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: _brandDark,
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Text(
-                        'Masuk ke Dashboard',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
+                        // Judul & Badge
+                        const Text(
+                          'MAMPIR',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 2,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, size: 18),
-                    ],
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _amberPrimary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _amberPrimary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Text(
+                            'PORTAL ADMINISTRATOR',
+                            style: TextStyle(
+                              color: _amberPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Slogan Singkat (1 Baris Ringkas)
+                        Text(
+                          'Masuk untuk mengelola data dan sistem MAMPIR',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Error Banner jika ada
+                        if (error != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7F1D1D)
+                                  .withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFEF4444)
+                                    .withValues(alpha: 0.6),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: Color(0xFFFCA5A5),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    error!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFFCA5A5),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                        ],
+
+                        // Input Email
+                        TextField(
+                          controller: email,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Email Administrator',
+                            labelStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                            ),
+                            hintText: 'admin@mampir.id',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.25),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.email_outlined,
+                              color: _amberPrimary,
+                              size: 20,
+                            ),
+                            filled: true,
+                            fillColor: _navyInput,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: _navyBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: _navyBorder),
+                            ),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(
+                                color: _amberPrimary,
+                                width: 1.6,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Input Password
+                        TextField(
+                          controller: password,
+                          obscureText: obscurePassword,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          onSubmitted: (_) => loading ? null : login(),
+                          decoration: InputDecoration(
+                            labelText: 'Kata Sandi',
+                            labelStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                            ),
+                            hintText: '••••••••',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.25),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              color: _amberPrimary,
+                              size: 20,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                obscurePassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: Colors.white54,
+                                size: 20,
+                              ),
+                              onPressed: () => setState(
+                                () => obscurePassword = !obscurePassword,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: _navyInput,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: _navyBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: _navyBorder),
+                            ),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(
+                                color: _amberPrimary,
+                                width: 1.6,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Checkbox Ingat Saya
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: rememberMe,
+                                activeColor: _amberPrimary,
+                                checkColor: _navyBg,
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                onChanged: (val) {
+                                  setState(() => rememberMe = val ?? false);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () =>
+                                  setState(() => rememberMe = !rememberMe),
+                              child: Text(
+                                'Ingat saya di perangkat ini',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+
+                        // Tombol Masuk
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: loading ? null : login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _amberPrimary,
+                              foregroundColor: _navyBg,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: loading
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: _navyBg,
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                    children: const [
+                                      Text(
+                                        'Masuk ke Dashboard',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Icon(
+                                        Icons.arrow_forward_rounded,
+                                        size: 18,
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 26),
+
+                        // Footer Copyright
+                        Text(
+                          '© 2026 Tim Proyek PML MAMPIR',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.35),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        Center(
-          child: Text(
-            '© 2026 Tim Proyek PML MAMPIR. Hak Cipta Dilindungi.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.35),
-              fontSize: 11,
+                ),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
