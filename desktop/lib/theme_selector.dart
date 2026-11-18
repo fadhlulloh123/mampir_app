@@ -143,101 +143,110 @@ class AdminThemeController {
 /// MODAL DIALOG PEMILIH TEMA (MIRIP TAMPILAN MOBILE)
 /// ==============================================================
 Future<void> showAdminThemeSelectorDialog(BuildContext context) async {
-  final isDark = AdminThemeController.isDark(context);
-  const amberPrimary = Color(0xFFD99B25);
-  final navyCard = isDark ? const Color(0xFF162035) : Colors.white;
-  final navySurface = isDark ? const Color(0xFF1A233A) : const Color(0xFFF1F5F9);
-  final navyBorder = isDark ? const Color(0xFF263353) : const Color(0xFFE2E8F0);
-  final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-  final textSecondary =
-      isDark ? Colors.white.withValues(alpha: 0.7) : const Color(0xFF475569);
-  final textMuted =
-      isDark ? Colors.white.withValues(alpha: 0.45) : const Color(0xFF94A3B8);
-
   await showDialog<void>(
     context: context,
-    builder: (dialogCtx) => Dialog(
-      backgroundColor: navyCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: navyBorder, width: 1.5),
-      ),
-      child: Container(
-        width: 480,
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle Bar Atas
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
+    builder: (dialogCtx) => ValueListenableBuilder<ThemeMode>(
+      valueListenable: AdminThemeController.themeModeNotifier,
+      builder: (ctx, currentMode, _) {
+        final platformBrightness = MediaQuery.platformBrightnessOf(context);
+        final isDark = currentMode == ThemeMode.dark ||
+            (currentMode == ThemeMode.system &&
+                platformBrightness == Brightness.dark);
 
-            // Header Judul
-            Row(
+        const amberPrimary = Color(0xFFD99B25);
+        final navyCard = isDark ? const Color(0xFF162035) : Colors.white;
+        final navySurface =
+            isDark ? const Color(0xFF1A233A) : const Color(0xFFF1F5F9);
+        final navyBorder =
+            isDark ? const Color(0xFF263353) : const Color(0xFFE2E8F0);
+        final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+        final textSecondary = isDark
+            ? Colors.white.withValues(alpha: 0.7)
+            : const Color(0xFF475569);
+        final textMuted = isDark
+            ? Colors.white.withValues(alpha: 0.45)
+            : const Color(0xFF94A3B8);
+
+        return Dialog(
+          backgroundColor: navyCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(color: navyBorder, width: 1.5),
+          ),
+          child: Container(
+            width: 480,
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: amberPrimary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.palette_rounded,
-                    color: amberPrimary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Pilih Tema Tampilan',
-                        style: TextStyle(
-                          color: textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Sesuaikan kenyamanan visual dashboard MAMPIR',
-                        style: TextStyle(
-                          color: textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                // Handle Bar Atas
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.close_rounded, color: textMuted, size: 20),
-                  onPressed: () => Navigator.pop(dialogCtx),
-                ),
-              ],
-            ),
+                const SizedBox(height: 18),
 
-            const SizedBox(height: 20),
-            Divider(height: 1, color: navyBorder),
-            const SizedBox(height: 16),
+                // Header Judul
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: amberPrimary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.palette_rounded,
+                        color: amberPrimary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pilih Tema Tampilan',
+                            style: TextStyle(
+                              color: textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Sesuaikan kenyamanan visual dashboard MAMPIR',
+                            style: TextStyle(
+                              color: textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded,
+                          color: textMuted, size: 20),
+                      onPressed: () => Navigator.pop(dialogCtx),
+                    ),
+                  ],
+                ),
 
-            // 3 Pilihan Tema (Gelap, Terang, Sistem)
-            ValueListenableBuilder<ThemeMode>(
-              valueListenable: AdminThemeController.themeModeNotifier,
-              builder: (ctx, currentMode, _) {
-                return Column(
+                const SizedBox(height: 20),
+                Divider(height: 1, color: navyBorder),
+                const SizedBox(height: 16),
+
+                // 3 Pilihan Tema (Gelap, Terang, Sistem)
+                Column(
                   children: AdminThemeController.options.map((option) {
                     final isSelected = currentMode == option.mode;
 
@@ -245,7 +254,8 @@ Future<void> showAdminThemeSelectorDialog(BuildContext context) async {
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? amberPrimary.withValues(alpha: isDark ? 0.16 : 0.1)
+                            ? amberPrimary
+                                .withValues(alpha: isDark ? 0.16 : 0.12)
                             : navySurface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
@@ -298,8 +308,10 @@ Future<void> showAdminThemeSelectorDialog(BuildContext context) async {
                                     color: isSelected
                                         ? amberPrimary.withValues(alpha: 0.2)
                                         : (isDark
-                                            ? Colors.white.withValues(alpha: 0.05)
-                                            : Colors.black.withValues(alpha: 0.04)),
+                                            ? Colors.white
+                                                .withValues(alpha: 0.05)
+                                            : Colors.black
+                                                .withValues(alpha: 0.04)),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(
@@ -313,7 +325,8 @@ Future<void> showAdminThemeSelectorDialog(BuildContext context) async {
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         option.title,
@@ -356,7 +369,8 @@ Future<void> showAdminThemeSelectorDialog(BuildContext context) async {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: textMuted.withValues(alpha: 0.5),
+                                        color:
+                                            textMuted.withValues(alpha: 0.5),
                                         width: 1.5,
                                       ),
                                     ),
@@ -368,24 +382,24 @@ Future<void> showAdminThemeSelectorDialog(BuildContext context) async {
                       ),
                     );
                   }).toList(),
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: textSecondary,
                 ),
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: const Text('Tutup'),
-              ),
+
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: textSecondary,
+                    ),
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text('Tutup'),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     ),
   );
 }
@@ -398,106 +412,115 @@ class AdminThemeToggleWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = AdminThemeController.isDark(context);
-    const amberPrimary = Color(0xFFD99B25);
-    final navyInput = isDark ? const Color(0xFF131B30) : const Color(0xFFF1F5F9);
-    final navyBorder = isDark ? const Color(0xFF263353) : const Color(0xFFE2E8F0);
-    final textMuted =
-        isDark ? Colors.white.withValues(alpha: 0.45) : const Color(0xFF94A3B8);
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AdminThemeController.themeModeNotifier,
+      builder: (context, currentMode, _) {
+        final platformBrightness = MediaQuery.platformBrightnessOf(context);
+        final isDarkEffective = currentMode == ThemeMode.dark ||
+            (currentMode == ThemeMode.system &&
+                platformBrightness == Brightness.dark);
 
-    return Column(
-      children: [
-        // 3-way Segmented Control
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: navyInput,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: navyBorder),
-          ),
-          child: ValueListenableBuilder<ThemeMode>(
-            valueListenable: AdminThemeController.themeModeNotifier,
-            builder: (context, currentMode, _) {
-              return Row(
+        const amberPrimary = Color(0xFFD99B25);
+        final containerBg = isDarkEffective
+            ? const Color(0xFF131B30)
+            : const Color(0xFFE2E8F0);
+        final containerBorder = isDarkEffective
+            ? const Color(0xFF263353)
+            : const Color(0xFFCBD5E1);
+        final textMuted = isDarkEffective
+            ? Colors.white.withValues(alpha: 0.5)
+            : const Color(0xFF64748B);
+
+        return Column(
+          children: [
+            // 3-way Segmented Control
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: containerBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: containerBorder),
+              ),
+              child: Row(
                 children: [
                   _buildSegment(
-                    context: context,
                     title: 'Gelap',
                     icon: Icons.dark_mode_rounded,
                     mode: ThemeMode.dark,
                     isActive: currentMode == ThemeMode.dark,
+                    isDarkEffective: isDarkEffective,
                     amberPrimary: amberPrimary,
                     textMuted: textMuted,
-                    isDark: isDark,
                   ),
                   _buildSegment(
-                    context: context,
                     title: 'Terang',
                     icon: Icons.light_mode_rounded,
                     mode: ThemeMode.light,
                     isActive: currentMode == ThemeMode.light,
+                    isDarkEffective: isDarkEffective,
                     amberPrimary: amberPrimary,
                     textMuted: textMuted,
-                    isDark: isDark,
                   ),
                   _buildSegment(
-                    context: context,
                     title: 'Sistem',
                     icon: Icons.settings_brightness_rounded,
                     mode: ThemeMode.system,
                     isActive: currentMode == ThemeMode.system,
+                    isDarkEffective: isDarkEffective,
                     amberPrimary: amberPrimary,
                     textMuted: textMuted,
-                    isDark: isDark,
                   ),
                 ],
-              );
-            },
-          ),
-        ),
-
-        const SizedBox(height: 6),
-
-        // Tombol Buka Modal / Dialog Lengkap
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => showAdminThemeSelectorDialog(context),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.palette_outlined,
-                  size: 13,
-                  color: amberPrimary.withValues(alpha: 0.8),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Buka Dialog Pilihan Tema',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: amberPrimary.withValues(alpha: 0.9),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ],
+
+            const SizedBox(height: 6),
+
+            // Tombol Buka Modal / Dialog Lengkap
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => showAdminThemeSelectorDialog(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.palette_outlined,
+                      size: 13,
+                      color: isDarkEffective
+                          ? amberPrimary.withValues(alpha: 0.85)
+                          : const Color(0xFFB45309),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Buka Dialog Pilihan Tema',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isDarkEffective
+                            ? amberPrimary.withValues(alpha: 0.95)
+                            : const Color(0xFFB45309),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildSegment({
-    required BuildContext context,
     required String title,
     required IconData icon,
     required ThemeMode mode,
     required bool isActive,
+    required bool isDarkEffective,
     required Color amberPrimary,
     required Color textMuted,
-    required bool isDark,
   }) {
     return Expanded(
       child: InkWell(
@@ -508,18 +531,23 @@ class AdminThemeToggleWidget extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
             color: isActive
-                ? (isDark ? const Color(0xFF1E2D4A) : Colors.white)
+                ? (isDarkEffective ? const Color(0xFF1E2D4A) : Colors.white)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: isActive
-                ? Border.all(color: amberPrimary.withValues(alpha: isDark ? 0.4 : 0.6))
+                ? Border.all(
+                    color: isDarkEffective
+                        ? amberPrimary.withValues(alpha: 0.5)
+                        : amberPrimary,
+                    width: isDarkEffective ? 1.0 : 1.5,
+                  )
                 : null,
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: isDark
+                      color: isDarkEffective
                           ? amberPrimary.withValues(alpha: 0.15)
-                          : Colors.black.withValues(alpha: 0.08),
+                          : Colors.black.withValues(alpha: 0.1),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -533,7 +561,9 @@ class AdminThemeToggleWidget extends StatelessWidget {
                 icon,
                 size: 13,
                 color: isActive
-                    ? (isDark ? amberPrimary : const Color(0xFFD97706))
+                    ? (isDarkEffective
+                        ? amberPrimary
+                        : const Color(0xFFD97706))
                     : textMuted,
               ),
               const SizedBox(width: 4),
@@ -543,7 +573,9 @@ class AdminThemeToggleWidget extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
                   color: isActive
-                      ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                      ? (isDarkEffective
+                          ? Colors.white
+                          : const Color(0xFF0F172A))
                       : textMuted,
                 ),
               ),
