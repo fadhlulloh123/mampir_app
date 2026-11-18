@@ -1,11 +1,11 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'theme_selector.dart';
 import 'user_activity_page.dart';
 
 const supabaseUrl = String.fromEnvironment(
@@ -20,34 +20,19 @@ const supabaseAnonKey = String.fromEnvironment(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final savedMode = prefs.getString('admin_theme_mode');
-    if (savedMode == 'light') {
-      adminThemeModeNotifier.value = ThemeMode.light;
-    } else {
-      adminThemeModeNotifier.value = ThemeMode.dark;
-    }
-  } catch (_) {}
+  await AdminThemeController.init();
   runApp(const AdminApp());
 }
 
-final ValueNotifier<ThemeMode> adminThemeModeNotifier =
-    ValueNotifier<ThemeMode>(ThemeMode.dark);
+ValueNotifier<ThemeMode> get adminThemeModeNotifier =>
+    AdminThemeController.themeModeNotifier;
 
-void toggleAdminTheme() async {
-  if (adminThemeModeNotifier.value == ThemeMode.dark) {
-    adminThemeModeNotifier.value = ThemeMode.light;
+void toggleAdminTheme() {
+  if (AdminThemeController.themeModeNotifier.value == ThemeMode.dark) {
+    AdminThemeController.setThemeMode(ThemeMode.light);
   } else {
-    adminThemeModeNotifier.value = ThemeMode.dark;
+    AdminThemeController.setThemeMode(ThemeMode.dark);
   }
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      'admin_theme_mode',
-      adminThemeModeNotifier.value == ThemeMode.dark ? 'dark' : 'light',
-    );
-  } catch (_) {}
 }
 
 ThemeData _buildDarkTheme() {
@@ -2670,14 +2655,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const SizedBox(height: 14),
                 _buildSidebarSectionTitle('TEMA TAMPILAN', textMuted),
-                _buildThemeToggle(
-                  isDark,
-                  amberPrimary,
-                  navyInput,
-                  navyBorder,
-                  textPrimary,
-                  textMuted,
-                ),
+                const AdminThemeToggleWidget(),
               ],
             ),
           ),
@@ -2765,122 +2743,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThemeToggle(
-    bool isDark,
-    Color amberPrimary,
-    Color navyInput,
-    Color navyBorder,
-    Color textPrimary,
-    Color textMuted,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: navyInput,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: navyBorder),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                if (!isDark) toggleAdminTheme();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E2D4A) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: isDark
-                      ? Border.all(color: amberPrimary.withValues(alpha: 0.4))
-                      : null,
-                  boxShadow: isDark
-                      ? [
-                          BoxShadow(
-                            color: amberPrimary.withValues(alpha: 0.2),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.dark_mode_rounded,
-                      size: 15,
-                      color: isDark ? amberPrimary : textMuted,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Gelap',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isDark ? FontWeight.w800 : FontWeight.w500,
-                        color: isDark ? Colors.white : textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                if (isDark) toggleAdminTheme();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: !isDark ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: !isDark
-                      ? Border.all(color: amberPrimary.withValues(alpha: 0.6))
-                      : null,
-                  boxShadow: !isDark
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.light_mode_rounded,
-                      size: 15,
-                      color: !isDark ? const Color(0xFFD97706) : textMuted,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Terang',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: !isDark ? FontWeight.w800 : FontWeight.w500,
-                        color: !isDark ? const Color(0xFF0F172A) : textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         ],
