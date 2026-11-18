@@ -34,12 +34,7 @@ class AdminApp extends StatelessWidget {
   );
 }
 
-enum OrnamentOrigin {
-  topRight,
-  bottomLeft,
-  topLeft,
-  bottomRight,
-}
+enum OrnamentOrigin { topRight, bottomLeft, topLeft, bottomRight }
 
 class MandalaOrnamentPainter extends CustomPainter {
   final double scale;
@@ -58,7 +53,8 @@ class MandalaOrnamentPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final effectiveColor = color ??
+    final effectiveColor =
+        color ??
         (isDark
             ? const Color(0xFFFFB74D).withValues(alpha: 0.16)
             : const Color(0xFFD97706).withValues(alpha: 0.20));
@@ -137,8 +133,9 @@ class FloatingBatikAccentPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final baseColor =
-        isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309);
+    final baseColor = isDark
+        ? const Color(0xFFFFB74D)
+        : const Color(0xFFB45309);
     final double opacity = isDark ? 0.16 : 0.22;
 
     final strokePaint = Paint()
@@ -283,10 +280,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
           'apikey': supabaseAnonKey,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'email': cleanEmail,
-          'password': cleanPassword,
-        }),
+        body: jsonEncode({'email': cleanEmail, 'password': cleanPassword}),
       );
 
       if (response.statusCode != 200) {
@@ -382,373 +376,395 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
             ),
           ),
 
-          // 5. Kartu Login di Tengah Layar (Scrollable, Tidak Ada Bug Overflow)
+          // 5. Kartu Login di Tengah Layar (Landscape / Memanjang)
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 440),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: _navyCard,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: _navyBorder,
-                        width: 1.5,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 32,
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isLandscape = constraints.maxWidth >= 760;
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isLandscape ? 820 : 440,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          blurRadius: 36,
-                          offset: const Offset(0, 14),
-                        ),
-                        BoxShadow(
-                          color: _amberPrimary.withValues(alpha: 0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 36,
-                      vertical: 36,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // TEPAT 1 LOGO MAMPIR (Tanpa Duplikasi)
-                        Container(
-                          width: 76,
-                          height: 76,
-                          decoration: BoxDecoration(
-                            color: _navySurface,
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(color: _amberPrimary, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _amberPrimary.withValues(alpha: 0.35),
-                                blurRadius: 18,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: Transform.scale(
-                              scale: 1.35,
-                              alignment: const Alignment(0, -0.04),
-                              child: Image.asset(
-                                'assets/images/app_icon.jpeg',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const Icon(
-                                  Icons.travel_explore_rounded,
-                                  size: 38,
-                                  color: _amberPrimary,
-                                ),
-                              ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _navyCard,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: _navyBorder, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              blurRadius: 36,
+                              offset: const Offset(0, 14),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Judul & Badge
-                        const Text(
-                          'MAMPIR',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _amberPrimary.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: _amberPrimary.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: const Text(
-                            'PORTAL ADMINISTRATOR',
-                            style: TextStyle(
-                              color: _amberPrimary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Slogan Singkat (1 Baris Ringkas)
-                        Text(
-                          'Masuk untuk mengelola data dan sistem MAMPIR',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Error Banner jika ada
-                        if (error != null) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7F1D1D)
-                                  .withValues(alpha: 0.35),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: const Color(0xFFEF4444)
-                                    .withValues(alpha: 0.6),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.error_outline_rounded,
-                                  color: Color(0xFFFCA5A5),
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    error!,
-                                    style: const TextStyle(
-                                      color: Color(0xFFFCA5A5),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                        ],
-
-                        // Input Email
-                        TextField(
-                          controller: email,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: 'Email Administrator',
-                            labelStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                            ),
-                            hintText: 'admin@mampir.id',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.25),
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.email_outlined,
-                              color: _amberPrimary,
-                              size: 20,
-                            ),
-                            filled: true,
-                            fillColor: _navyInput,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: _navyBorder),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: _navyBorder),
-                            ),
-                            focusedBorder: const OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(12)),
-                              borderSide: BorderSide(
-                                color: _amberPrimary,
-                                width: 1.6,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Input Password
-                        TextField(
-                          controller: password,
-                          obscureText: obscurePassword,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          onSubmitted: (_) => loading ? null : login(),
-                          decoration: InputDecoration(
-                            labelText: 'Kata Sandi',
-                            labelStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                            ),
-                            hintText: '••••••••',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.25),
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.lock_outline_rounded,
-                              color: _amberPrimary,
-                              size: 20,
-                            ),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: Colors.white54,
-                                size: 20,
-                              ),
-                              onPressed: () => setState(
-                                () => obscurePassword = !obscurePassword,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: _navyInput,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: _navyBorder),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: _navyBorder),
-                            ),
-                            focusedBorder: const OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(12)),
-                              borderSide: BorderSide(
-                                color: _amberPrimary,
-                                width: 1.6,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Checkbox Ingat Saya
-                        Row(
-                          children: [
-                            SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: Checkbox(
-                                value: rememberMe,
-                                activeColor: _amberPrimary,
-                                checkColor: _navyBg,
-                                side: BorderSide(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                onChanged: (val) {
-                                  setState(() => rememberMe = val ?? false);
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () =>
-                                  setState(() => rememberMe = !rememberMe),
-                              child: Text(
-                                'Ingat saya di perangkat ini',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.75),
-                                  fontSize: 13,
-                                ),
-                              ),
+                            BoxShadow(
+                              color: _amberPrimary.withValues(alpha: 0.08),
+                              blurRadius: 24,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 22),
-
-                        // Tombol Masuk
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: loading ? null : login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _amberPrimary,
-                              foregroundColor: _navyBg,
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: loading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: _navyBg,
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                    children: const [
-                                      Text(
-                                        'Masuk ke Dashboard',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.3,
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Icon(
-                                        Icons.arrow_forward_rounded,
-                                        size: 18,
-                                      ),
-                                    ],
-                                  ),
-                          ),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isLandscape ? 40 : 28,
+                          vertical: isLandscape ? 36 : 32,
                         ),
-                        const SizedBox(height: 26),
-
-                        // Footer Copyright
-                        Text(
-                          '© 2026 Tim Proyek PML MAMPIR',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.35),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        child: isLandscape
+                            ? _buildLandscapeContent()
+                            : _buildPortraitContent(),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLandscapeContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Kolom Kiri: Branding & Logo
+              Expanded(flex: 4, child: _buildBrandingSide()),
+
+              // Garis Pembatas Vertikal Halus
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 8,
+                ),
+                child: Container(width: 1, color: _navyBorder),
+              ),
+
+              // Kolom Kanan: Form Input
+              Expanded(flex: 5, child: _buildFormSide()),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          '© 2026 Tim Proyek PML MAMPIR',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.35),
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBrandingSide() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // 1 Logo MAMPIR
+        Container(
+          width: 82,
+          height: 82,
+          decoration: BoxDecoration(
+            color: _navySurface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _amberPrimary, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: _amberPrimary.withValues(alpha: 0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Transform.scale(
+              scale: 1.35,
+              alignment: const Alignment(0, -0.04),
+              child: Image.asset(
+                'assets/images/app_icon.jpeg',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.travel_explore_rounded,
+                  size: 42,
+                  color: _amberPrimary,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'MAMPIR',
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: _amberPrimary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _amberPrimary.withValues(alpha: 0.3)),
+          ),
+          child: const Text(
+            'PORTAL ADMINISTRATOR',
+            style: TextStyle(
+              color: _amberPrimary,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Masuk untuk mengelola data\ndan sistem MAMPIR',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormSide() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (error != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7F1D1D).withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Color(0xFFFCA5A5),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    error!,
+                    style: const TextStyle(
+                      color: Color(0xFFFCA5A5),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        // Input Email
+        TextField(
+          controller: email,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          decoration: InputDecoration(
+            labelText: 'Email Administrator',
+            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+            hintText: 'admin@mampir.id',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+            prefixIcon: const Icon(
+              Icons.email_outlined,
+              color: _amberPrimary,
+              size: 20,
+            ),
+            filled: true,
+            fillColor: _navyInput,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _navyBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _navyBorder),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: _amberPrimary, width: 1.6),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Input Password
+        TextField(
+          controller: password,
+          obscureText: obscurePassword,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          onSubmitted: (_) => loading ? null : login(),
+          decoration: InputDecoration(
+            labelText: 'Kata Sandi',
+            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+            hintText: '••••••••',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
+            prefixIcon: const Icon(
+              Icons.lock_outline_rounded,
+              color: _amberPrimary,
+              size: 20,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: Colors.white54,
+                size: 20,
+              ),
+              onPressed: () =>
+                  setState(() => obscurePassword = !obscurePassword),
+            ),
+            filled: true,
+            fillColor: _navyInput,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _navyBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _navyBorder),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: _amberPrimary, width: 1.6),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Checkbox Ingat Saya
+        Row(
+          children: [
+            SizedBox(
+              height: 24,
+              width: 24,
+              child: Checkbox(
+                value: rememberMe,
+                activeColor: _amberPrimary,
+                checkColor: _navyBg,
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                onChanged: (val) {
+                  setState(() => rememberMe = val ?? false);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => rememberMe = !rememberMe),
+              child: Text(
+                'Ingat saya di perangkat ini',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Tombol Masuk
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: ElevatedButton(
+            onPressed: loading ? null : login,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _amberPrimary,
+              foregroundColor: _navyBg,
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _navyBg,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text(
+                        'Masuk ke Dashboard',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPortraitContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildBrandingSide(),
+        const SizedBox(height: 24),
+        _buildFormSide(),
+        const SizedBox(height: 24),
+        Text(
+          '© 2026 Tim Proyek PML MAMPIR',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.35),
+            fontSize: 11,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -813,7 +829,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         final name = (place['name'] as String? ?? '').toLowerCase();
         final cat = (place['category'] as String? ?? '').toLowerCase();
         final addr = (place['address'] as String? ?? '').toLowerCase();
-        if (!name.contains(query) && !cat.contains(query) && !addr.contains(query)) {
+        if (!name.contains(query) &&
+            !cat.contains(query) &&
+            !addr.contains(query)) {
           return false;
         }
       }
@@ -1056,7 +1074,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       body: jsonEncode(place),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Gagal menambahkan tempat (${response.statusCode}): ${response.body}');
+      throw Exception(
+        'Gagal menambahkan tempat (${response.statusCode}): ${response.body}',
+      );
     }
     await loadPlaces();
   }
@@ -1095,7 +1115,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tempat "${place['name']}" berhasil dihapus.')),
+          SnackBar(
+            content: Text('Tempat "${place['name']}" berhasil dihapus.'),
+          ),
         );
       }
       await loadPlaces();
@@ -1160,23 +1182,61 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       children: [
                         Column(
                           children: [
-                            const Text('Total Tempat', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            const Text(
+                              'Total Tempat',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text('${places.length}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text(
+                              '${places.length}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                         Column(
                           children: [
-                            const Text('Rating Rata-rata', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            const Text(
+                              'Rating Rata-rata',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text('${avgRating.toStringAsFixed(1)} ★', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
+                            Text(
+                              '${avgRating.toStringAsFixed(1)} ★',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber,
+                              ),
+                            ),
                           ],
                         ),
                         Column(
                           children: [
-                            const Text('Rata-rata Budget', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            const Text(
+                              'Rata-rata Budget',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text('Rp ${avgBudget.toStringAsFixed(0)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xffd99b25))),
+                            Text(
+                              'Rp ${avgBudget.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xffd99b25),
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -1190,13 +1250,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const SizedBox(height: 8),
                 ...zoneCounts.entries.map((e) {
-                  final pct = places.isNotEmpty ? (e.value / places.length * 100).toStringAsFixed(1) : '0';
+                  final pct = places.isNotEmpty
+                      ? (e.value / places.length * 100).toStringAsFixed(1)
+                      : '0';
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
-                        Expanded(child: Text(e.key, style: const TextStyle(fontSize: 13))),
-                        Text('${e.value} tempat ($pct%)', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Text(
+                            e.key,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        Text(
+                          '${e.value} tempat ($pct%)',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -1309,7 +1382,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Tempat baru berhasil ditambahkan ke Supabase!'),
+                                  content: Text(
+                                    'Tempat baru berhasil ditambahkan ke Supabase!',
+                                  ),
                                 ),
                               );
                             }
@@ -1338,16 +1413,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       child: TextField(
                         controller: searchController,
                         decoration: InputDecoration(
-                          hintText: 'Cari tempat berdasarkan nama, kategori, atau alamat (WADM-2)...',
+                          hintText:
+                              'Cari tempat berdasarkan nama, kategori, atau alamat (WADM-2)...',
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: searchController.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear),
-                                  onPressed: () => setState(() => searchController.clear()),
+                                  onPressed: () =>
+                                      setState(() => searchController.clear()),
                                 )
                               : null,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -1359,13 +1441,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         initialValue: selectedZone,
                         decoration: InputDecoration(
                           labelText: 'Filter 7 Zona Wilayah (WADM-2)',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                         items: zones
-                            .map((z) => DropdownMenuItem(value: z, child: Text(z, overflow: TextOverflow.ellipsis)))
+                            .map(
+                              (z) => DropdownMenuItem(
+                                value: z,
+                                child: Text(z, overflow: TextOverflow.ellipsis),
+                              ),
+                            )
                             .toList(),
-                        onChanged: (val) => setState(() => selectedZone = val ?? 'Semua Wilayah'),
+                        onChanged: (val) => setState(
+                          () => selectedZone = val ?? 'Semua Wilayah',
+                        ),
                       ),
                     ),
                   ],
@@ -1385,32 +1479,44 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           )
                         : ListView.separated(
                             itemCount: filteredPlaces.length,
-                            separatorBuilder: (_, index) => const Divider(height: 1),
+                            separatorBuilder: (_, index) =>
+                                const Divider(height: 1),
                             itemBuilder: (_, index) {
                               final place = filteredPlaces[index];
                               return ListTile(
                                 leading: CircleAvatar(
-                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primaryContainer,
                                   child: Icon(
                                     place['category'] == 'Warkop'
                                         ? Icons.coffee_rounded
                                         : place['category'] == 'Restoran'
-                                            ? Icons.restaurant_rounded
-                                            : Icons.local_cafe_rounded,
-                                    color: Theme.of(context).colorScheme.primary,
+                                        ? Icons.restaurant_rounded
+                                        : Icons.local_cafe_rounded,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                                 title: Row(
                                   children: [
                                     Text(
                                       '${place['name'] ?? '-'}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceContainerHighest,
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
@@ -1442,7 +1548,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                           if (context.mounted) {
                                             ScaffoldMessenger.of(
                                               context,
-                                            ).showSnackBar(SnackBar(content: Text('$e')));
+                                            ).showSnackBar(
+                                              SnackBar(content: Text('$e')),
+                                            );
                                           }
                                         }
                                       },
@@ -1450,7 +1558,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                     ),
                                     const SizedBox(width: 8),
                                     IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.redAccent,
+                                      ),
                                       tooltip: 'Hapus Tempat (WADM-5)',
                                       onPressed: () => deletePlace(place),
                                     ),
@@ -1609,8 +1720,11 @@ Future<Map<String, dynamic>?> showPlaceEditor(
             'longitude': double.tryParse(longitude.text) ?? source['longitude'],
             'min_price': int.tryParse(minPrice.text) ?? source['min_price'],
             'max_price': int.tryParse(maxPrice.text) ?? source['max_price'],
-            'avg_price': ((int.tryParse(minPrice.text) ?? (source['min_price'] ?? 0)) +
-                    (int.tryParse(maxPrice.text) ?? (source['max_price'] ?? 0))) ~/ 2,
+            'avg_price':
+                ((int.tryParse(minPrice.text) ?? (source['min_price'] ?? 0)) +
+                    (int.tryParse(maxPrice.text) ??
+                        (source['max_price'] ?? 0))) ~/
+                2,
           }),
           child: const Text('Simpan'),
         ),
@@ -1627,7 +1741,10 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
   final name = TextEditingController();
   final address = TextEditingController();
   final description = TextEditingController();
-  final image = TextEditingController(text: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80');
+  final image = TextEditingController(
+    text:
+        'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80',
+  );
   final openHours = TextEditingController(text: '09.00 - 22.00 WIB');
   final minPrice = TextEditingController(text: '15000');
   final maxPrice = TextEditingController(text: '40000');
@@ -1677,25 +1794,47 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: selectedCategory,
-                        decoration: const InputDecoration(labelText: 'Kategori *'),
-                        items: (categories.isNotEmpty ? categories : [{'name': 'Cafe'}, {'name': 'Warkop'}, {'name': 'Restoran'}])
-                            .map((item) => DropdownMenuItem<String>(
-                                  value: '${item['name']}',
-                                  child: Text('${item['name']}'),
-                                ))
-                            .toList(),
-                        onChanged: (val) => setModalState(() => selectedCategory = val ?? selectedCategory),
+                        decoration: const InputDecoration(
+                          labelText: 'Kategori *',
+                        ),
+                        items:
+                            (categories.isNotEmpty
+                                    ? categories
+                                    : [
+                                        {'name': 'Cafe'},
+                                        {'name': 'Warkop'},
+                                        {'name': 'Restoran'},
+                                      ])
+                                .map(
+                                  (item) => DropdownMenuItem<String>(
+                                    value: '${item['name']}',
+                                    child: Text('${item['name']}'),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged: (val) => setModalState(
+                          () => selectedCategory = val ?? selectedCategory,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: selectedCity,
-                        decoration: const InputDecoration(labelText: 'Zona Wilayah *'),
+                        decoration: const InputDecoration(
+                          labelText: 'Zona Wilayah *',
+                        ),
                         items: availableZones
-                            .map((z) => DropdownMenuItem(value: z, child: Text(z, overflow: TextOverflow.ellipsis)))
+                            .map(
+                              (z) => DropdownMenuItem(
+                                value: z,
+                                child: Text(z, overflow: TextOverflow.ellipsis),
+                              ),
+                            )
                             .toList(),
-                        onChanged: (val) => setModalState(() => selectedCity = val ?? selectedCity),
+                        onChanged: (val) => setModalState(
+                          () => selectedCity = val ?? selectedCity,
+                        ),
                       ),
                     ),
                   ],
@@ -1738,7 +1877,9 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     Expanded(
                       child: TextField(
                         controller: minPrice,
-                        decoration: const InputDecoration(labelText: 'Harga Min (Rp)'),
+                        decoration: const InputDecoration(
+                          labelText: 'Harga Min (Rp)',
+                        ),
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -1746,7 +1887,9 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     Expanded(
                       child: TextField(
                         controller: maxPrice,
-                        decoration: const InputDecoration(labelText: 'Harga Max (Rp)'),
+                        decoration: const InputDecoration(
+                          labelText: 'Harga Max (Rp)',
+                        ),
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -1755,7 +1898,9 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                 const SizedBox(height: 12),
                 TextField(
                   controller: openHours,
-                  decoration: const InputDecoration(labelText: 'Jam Operasional'),
+                  decoration: const InputDecoration(
+                    labelText: 'Jam Operasional',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -1766,7 +1911,9 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                 TextField(
                   controller: description,
                   maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'Deskripsi Singkat'),
+                  decoration: const InputDecoration(
+                    labelText: 'Deskripsi Singkat',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -1796,20 +1943,28 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
 
               if (n.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Nama tempat wajib diisi.'), backgroundColor: Colors.redAccent),
+                  const SnackBar(
+                    content: Text('Nama tempat wajib diisi.'),
+                    backgroundColor: Colors.redAccent,
+                  ),
                 );
                 return;
               }
               if (addr.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Alamat tempat wajib diisi.'), backgroundColor: Colors.redAccent),
+                  const SnackBar(
+                    content: Text('Alamat tempat wajib diisi.'),
+                    backgroundColor: Colors.redAccent,
+                  ),
                 );
                 return;
               }
               if (lat == null || lat < -7.6 || lat > -7.2) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Latitude tidak valid untuk wilayah Purwokerto/Banyumas (-7.6 s/d -7.2).'),
+                    content: Text(
+                      'Latitude tidak valid untuk wilayah Purwokerto/Banyumas (-7.6 s/d -7.2).',
+                    ),
                     backgroundColor: Colors.redAccent,
                   ),
                 );
@@ -1818,7 +1973,9 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
               if (lng == null || lng < 109.0 || lng > 109.5) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Longitude tidak valid untuk wilayah Purwokerto/Banyumas (109.0 s/d 109.5).'),
+                    content: Text(
+                      'Longitude tidak valid untuk wilayah Purwokerto/Banyumas (109.0 s/d 109.5).',
+                    ),
                     backgroundColor: Colors.redAccent,
                   ),
                 );
