@@ -1,9 +1,12 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'user_activity_page.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -15,66 +18,181 @@ const supabaseAnonKey = String.fromEnvironment(
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkcWRpdGh4dWp4dnp5eWJqdHBuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA2NTIsImV4cCI6MjEwODgwNjY1Mn0.7zE0gLxh0a2DNzdVcRfTj3EZDaqXWZ09kL5gcXTETXY',
 );
 
-void main() => runApp(const AdminApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final savedMode = prefs.getString('admin_theme_mode');
+    if (savedMode == 'light') {
+      adminThemeModeNotifier.value = ThemeMode.light;
+    } else {
+      adminThemeModeNotifier.value = ThemeMode.dark;
+    }
+  } catch (_) {}
+  runApp(const AdminApp());
+}
+
+final ValueNotifier<ThemeMode> adminThemeModeNotifier =
+    ValueNotifier<ThemeMode>(ThemeMode.dark);
+
+void toggleAdminTheme() async {
+  if (adminThemeModeNotifier.value == ThemeMode.dark) {
+    adminThemeModeNotifier.value = ThemeMode.light;
+  } else {
+    adminThemeModeNotifier.value = ThemeMode.dark;
+  }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'admin_theme_mode',
+      adminThemeModeNotifier.value == ThemeMode.dark ? 'dark' : 'light',
+    );
+  } catch (_) {}
+}
+
+ThemeData _buildDarkTheme() {
+  const amberPrimary = Color(0xFFD99B25);
+  const navyBg = Color(0xFF0D1326);
+  const navyCard = Color(0xFF162035);
+  const navyInput = Color(0xFF131B30);
+  const navyBorder = Color(0xFF263353);
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    scaffoldBackgroundColor: navyBg,
+    primaryColor: amberPrimary,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: amberPrimary,
+      brightness: Brightness.dark,
+      surface: navyCard,
+      onSurface: Colors.white,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: navyCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: navyBorder, width: 1.5),
+      ),
+      elevation: 16,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: navyInput,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: navyBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: navyBorder),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(10)),
+        borderSide: BorderSide(color: amberPrimary, width: 1.5),
+      ),
+      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: navyInput,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+    ),
+    cardTheme: CardThemeData(
+      color: navyCard,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: navyBorder, width: 1),
+      ),
+    ),
+  );
+}
+
+ThemeData _buildLightTheme() {
+  const amberPrimary = Color(0xFFD99B25);
+  const lightBg = Color(0xFFF8FAFC);
+  const lightCard = Colors.white;
+  const lightInput = Color(0xFFF1F5F9);
+  const lightBorder = Color(0xFFE2E8F0);
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.light,
+    scaffoldBackgroundColor: lightBg,
+    primaryColor: amberPrimary,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: amberPrimary,
+      brightness: Brightness.light,
+      surface: lightCard,
+      onSurface: const Color(0xFF0F172A),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: lightCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: lightBorder, width: 1.5),
+      ),
+      elevation: 16,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: lightInput,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: lightBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: lightBorder),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(10)),
+        borderSide: BorderSide(color: amberPrimary, width: 1.5),
+      ),
+      labelStyle: const TextStyle(color: Color(0xFF64748B)),
+      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.white,
+      foregroundColor: Color(0xFF0F172A),
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+    ),
+    cardTheme: CardThemeData(
+      color: lightCard,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: lightBorder, width: 1),
+      ),
+    ),
+  );
+}
 
 class AdminApp extends StatelessWidget {
   const AdminApp({super.key});
+
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'MAMPIR Admin',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xffd99b25),
-        brightness: Brightness.dark,
-        surface: const Color(0xFF162035),
-      ),
-      scaffoldBackgroundColor: const Color(0xFF0D1326),
-      dialogTheme: DialogThemeData(
-        backgroundColor: const Color(0xFF162035),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0xFF263353), width: 1.5),
-        ),
-        elevation: 16,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFF131B30),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFF263353)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFF263353)),
-        ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: Color(0xFFD99B25), width: 1.5),
-        ),
-        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF131B30),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      cardTheme: CardThemeData(
-        color: const Color(0xFF162035),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF263353), width: 1),
-        ),
-      ),
-      useMaterial3: true,
-    ),
-    home: const AdminLoginPage(),
-  );
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: adminThemeModeNotifier,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: 'MAMPIR Admin',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeMode,
+          theme: _buildLightTheme(),
+          darkTheme: _buildDarkTheme(),
+          home: const AdminLoginPage(),
+        );
+      },
+    );
+  }
 }
 
 enum OrnamentOrigin { topRight, bottomLeft, topLeft, bottomRight }
@@ -339,6 +457,23 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       }
 
       await _saveCredentials();
+
+      try {
+        await http.post(
+          Uri.parse('$supabaseUrl/rest/v1/user_activities'),
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: jsonEncode({
+            'email': cleanEmail,
+            'action': 'ADMIN_LOGIN',
+            'details': 'Administrator masuk ke panel dashboard',
+          }),
+        );
+      } catch (_) {}
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -820,6 +955,8 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
+  int _selectedNavIndex = 0; // 0 = Katalog Tempat, 1 = Aktivitas & Akun
+  int userCount = 0;
   List<Map<String, dynamic>> places = [];
   List<Map<String, dynamic>> categories = [];
   List<Map<String, dynamic>> preferences = [];
@@ -1341,15 +1478,49 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     loadPlaces();
+    fetchUserCount();
+  }
+
+  Future<void> fetchUserCount() async {
+    try {
+      final r = await http.get(
+        Uri.parse('$supabaseUrl/rest/v1/admin_user_list?select=id'),
+        headers: headers,
+      );
+      if (r.statusCode == 200 && mounted) {
+        final list = jsonDecode(r.body) as List<dynamic>;
+        setState(() => userCount = list.length);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    const navyBg = Color(0xFF0D1326);
-    const navyCard = Color(0xFF162035);
-    const navySurface = Color(0xFF1A233A);
-    const navyInput = Color(0xFF131B30);
-    const navyBorder = Color(0xFF263353);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navyBg = isDark ? const Color(0xFF0D1326) : const Color(0xFFF8FAFC);
+    final navyCard = isDark ? const Color(0xFF162035) : Colors.white;
+    final navySurface = isDark
+        ? const Color(0xFF1A233A)
+        : const Color(0xFFF1F5F9);
+    final navyInput = isDark
+        ? const Color(0xFF131B30)
+        : const Color(0xFFF1F5F9);
+    final navyBorder = isDark
+        ? const Color(0xFF263353)
+        : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textSecondary = isDark
+        ? Colors.white.withValues(alpha: 0.7)
+        : const Color(0xFF475569);
+    final textMuted = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : const Color(0xFF94A3B8);
     const amberPrimary = Color(0xFFD99B25);
 
     return Scaffold(
@@ -1357,7 +1528,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
       body: Row(
         children: [
           // 1. Sidebar Navigasi di Sebelah Kiri
-          _buildSidebar(context, navyInput, navySurface, navyBorder, amberPrimary),
+          _buildSidebar(
+            context,
+            isDark,
+            navyInput,
+            navySurface,
+            navyBorder,
+            amberPrimary,
+            textPrimary,
+            textSecondary,
+            textMuted,
+          ),
 
           // 2. Area Konten Utama Dashboard di Kanan
           Expanded(
@@ -1373,7 +1554,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: CustomPaint(
                       painter: MandalaOrnamentPainter(
                         scale: 1.1,
-                        isDark: true,
+                        isDark: isDark,
                         origin: OrnamentOrigin.topRight,
                       ),
                     ),
@@ -1390,7 +1571,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: CustomPaint(
                       painter: MandalaOrnamentPainter(
                         scale: 0.95,
-                        isDark: true,
+                        isDark: isDark,
                         origin: OrnamentOrigin.bottomLeft,
                       ),
                     ),
@@ -1401,7 +1582,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Positioned.fill(
                   child: IgnorePointer(
                     child: CustomPaint(
-                      painter: FloatingBatikAccentPainter(isDark: true),
+                      painter: FloatingBatikAccentPainter(isDark: isDark),
                     ),
                   ),
                 ),
@@ -1414,15 +1595,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ? const Center(child: CircularProgressIndicator())
                         : error != null
                         ? Center(child: Text(error!))
+                        : _selectedNavIndex == 1
+                        ? UserActivityPage(
+                            token: widget.token,
+                            supabaseUrl: supabaseUrl,
+                            supabaseAnonKey: supabaseAnonKey,
+                            onUserCountChanged: (count) {
+                              if (mounted) {
+                                setState(() => userCount = count);
+                              }
+                            },
+                          )
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Top Bar Header Konten
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Katalog Tempat Kuliner',
@@ -1431,7 +1625,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                             .headlineSmall
                                             ?.copyWith(
                                               fontWeight: FontWeight.w900,
-                                              color: Colors.white,
+                                              color: textPrimary,
                                               letterSpacing: -0.5,
                                             ),
                                       ),
@@ -1439,7 +1633,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                       Text(
                                         'Menampilkan ${filteredPlaces.length} dari ${places.length} data rekomendasi kuliner & wisata di Banyumas',
                                         style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.65),
+                                          color: textSecondary,
                                           fontSize: 13,
                                         ),
                                       ),
@@ -1456,7 +1650,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                         try {
                                           await addPlace(newPlace);
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
                                                   'Tempat baru berhasil ditambahkan ke Supabase!',
@@ -1466,10 +1662,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                           }
                                         } catch (e) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               SnackBar(
                                                 content: Text('$e'),
-                                                backgroundColor: Colors.redAccent,
+                                                backgroundColor:
+                                                    Colors.redAccent,
                                               ),
                                             );
                                           }
@@ -1488,7 +1687,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                    icon: const Icon(Icons.add_rounded, size: 20),
+                                    icon: const Icon(
+                                      Icons.add_rounded,
+                                      size: 20,
+                                    ),
                                     label: const Text(
                                       'Tambah Tempat Baru (WADM-3)',
                                       style: TextStyle(
@@ -1508,39 +1710,60 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                     flex: 3,
                                     child: TextField(
                                       controller: searchController,
-                                      style: const TextStyle(color: Colors.white),
+                                      style: TextStyle(color: textPrimary),
                                       decoration: InputDecoration(
                                         hintText:
                                             'Cari tempat berdasarkan nama, kategori, atau alamat (WADM-2)...',
-                                        hintStyle: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.35),
+                                        hintStyle: TextStyle(color: textMuted),
+                                        prefixIcon: const Icon(
+                                          Icons.search,
+                                          color: amberPrimary,
                                         ),
-                                        prefixIcon: const Icon(Icons.search, color: amberPrimary),
-                                        suffixIcon: searchController.text.isNotEmpty
+                                        suffixIcon:
+                                            searchController.text.isNotEmpty
                                             ? IconButton(
-                                                icon: const Icon(Icons.clear, color: Colors.white70),
-                                                onPressed: () =>
-                                                    setState(() => searchController.clear()),
+                                                icon: Icon(
+                                                  Icons.clear,
+                                                  color: textSecondary,
+                                                ),
+                                                onPressed: () => setState(
+                                                  () =>
+                                                      searchController.clear(),
+                                                ),
                                               )
                                             : null,
                                         filled: true,
                                         fillColor: navyInput,
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                          borderSide: const BorderSide(color: navyBorder),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: navyBorder,
+                                          ),
                                         ),
                                         enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                          borderSide: const BorderSide(color: navyBorder),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: navyBorder,
+                                          ),
                                         ),
                                         focusedBorder: const OutlineInputBorder(
-                                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                                          borderSide: BorderSide(color: amberPrimary, width: 1.5),
+                                          borderRadius: BorderRadius.all(
+                                            Radius.circular(10),
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: amberPrimary,
+                                            width: 1.5,
+                                          ),
                                         ),
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 14,
-                                          vertical: 10,
-                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 10,
+                                            ),
                                       ),
                                       onChanged: (_) => setState(() {}),
                                     ),
@@ -1551,30 +1774,45 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                     child: DropdownButtonFormField<String>(
                                       initialValue: selectedZone,
                                       dropdownColor: navyCard,
-                                      style: const TextStyle(color: Colors.white),
+                                      style: TextStyle(color: textPrimary),
                                       decoration: InputDecoration(
-                                        labelText: 'Filter 7 Zona Wilayah (WADM-2)',
+                                        labelText:
+                                            'Filter 7 Zona Wilayah (WADM-2)',
                                         labelStyle: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.7),
+                                          color: textSecondary,
                                         ),
                                         filled: true,
                                         fillColor: navyInput,
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                          borderSide: const BorderSide(color: navyBorder),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: navyBorder,
+                                          ),
                                         ),
                                         enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                          borderSide: const BorderSide(color: navyBorder),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: navyBorder,
+                                          ),
                                         ),
                                         focusedBorder: const OutlineInputBorder(
-                                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                                          borderSide: BorderSide(color: amberPrimary, width: 1.5),
+                                          borderRadius: BorderRadius.all(
+                                            Radius.circular(10),
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: amberPrimary,
+                                            width: 1.5,
+                                          ),
                                         ),
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
                                       ),
                                       items: zones
                                           .map(
@@ -1583,13 +1821,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                               child: Text(
                                                 z,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(color: Colors.white),
+                                                style: TextStyle(
+                                                  color: textPrimary,
+                                                ),
                                               ),
                                             ),
                                           )
                                           .toList(),
                                       onChanged: (val) => setState(
-                                        () => selectedZone = val ?? 'Semua Wilayah',
+                                        () => selectedZone =
+                                            val ?? 'Semua Wilayah',
                                       ),
                                     ),
                                   ),
@@ -1602,18 +1843,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 child: filteredPlaces.isEmpty
                                     ? Center(
                                         child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
-                                            const Icon(
+                                            Icon(
                                               Icons.search_off_rounded,
                                               size: 52,
-                                              color: Colors.white30,
+                                              color: textMuted,
                                             ),
                                             const SizedBox(height: 14),
-                                            const Text(
+                                            Text(
                                               'Tidak ada tempat kuliner yang sesuai',
                                               style: TextStyle(
-                                                color: Colors.white70,
+                                                color: textPrimary,
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -1622,7 +1864,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                             Text(
                                               'Coba sesuaikan kata kunci pencarian atau ubah filter zona wilayah.',
                                               style: TextStyle(
-                                                color: Colors.white.withValues(alpha: 0.45),
+                                                color: textMuted,
                                                 fontSize: 13,
                                               ),
                                             ),
@@ -1631,26 +1873,47 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                       )
                                     : ListView.separated(
                                         itemCount: filteredPlaces.length,
-                                        separatorBuilder: (_, index) => const SizedBox(height: 10),
+                                        separatorBuilder: (_, index) =>
+                                            const SizedBox(height: 10),
                                         itemBuilder: (context, index) {
                                           final place = filteredPlaces[index];
-                                          final imageUrl = (place['image_url'] as String? ?? '').trim();
-                                          final category = place['category'] as String? ?? 'Cafe';
-                                          final city = place['city'] as String? ?? 'Purwokerto';
-                                          final rating = place['rating']?.toString() ?? '4.5';
-                                          final minP = place['min_price']?.toString() ?? '0';
-                                          final maxP = place['max_price']?.toString() ?? '0';
-                                          final hours = place['open_hours'] as String? ?? '';
+                                          final imageUrl =
+                                              (place['image_url'] as String? ??
+                                                      '')
+                                                  .trim();
+                                          final category =
+                                              place['category'] as String? ??
+                                              'Cafe';
+                                          final city =
+                                              place['city'] as String? ??
+                                              'Purwokerto';
+                                          final rating =
+                                              place['rating']?.toString() ??
+                                              '4.5';
+                                          final minP =
+                                              place['min_price']?.toString() ??
+                                              '0';
+                                          final maxP =
+                                              place['max_price']?.toString() ??
+                                              '0';
+                                          final hours =
+                                              place['open_hours'] as String? ??
+                                              '';
 
                                           return Container(
                                             decoration: BoxDecoration(
                                               color: navyCard,
-                                              borderRadius: BorderRadius.circular(14),
-                                              border: Border.all(color: navyBorder, width: 1.2),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: navyBorder,
+                                                width: 1.2,
+                                              ),
                                             ),
                                             padding: const EdgeInsets.all(14),
                                             child: Row(
-                                              crossAxisAlignment: CrossAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
                                               children: [
                                                 // Thumbnail Image
                                                 Container(
@@ -1658,33 +1921,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                   height: 76,
                                                   decoration: BoxDecoration(
                                                     color: navyInput,
-                                                    borderRadius: BorderRadius.circular(10),
-                                                    border: Border.all(color: navyBorder),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: navyBorder,
+                                                    ),
                                                   ),
                                                   clipBehavior: Clip.antiAlias,
                                                   child: imageUrl.isNotEmpty
                                                       ? Image.network(
                                                           imageUrl,
                                                           fit: BoxFit.cover,
-                                                          errorBuilder: (context, error, stackTrace) => Center(
-                                                            child: Icon(
-                                                              category == 'Warkop'
-                                                                  ? Icons.coffee_rounded
-                                                                  : category == 'Restoran'
-                                                                      ? Icons.restaurant_rounded
-                                                                      : Icons.local_cafe_rounded,
-                                                              color: amberPrimary,
-                                                              size: 30,
-                                                            ),
-                                                          ),
+                                                          errorBuilder:
+                                                              (
+                                                                context,
+                                                                error,
+                                                                stackTrace,
+                                                              ) => Center(
+                                                                child: Icon(
+                                                                  category ==
+                                                                          'Warkop'
+                                                                      ? Icons
+                                                                            .coffee_rounded
+                                                                      : category ==
+                                                                            'Restoran'
+                                                                      ? Icons
+                                                                            .restaurant_rounded
+                                                                      : Icons
+                                                                            .local_cafe_rounded,
+                                                                  color:
+                                                                      amberPrimary,
+                                                                  size: 30,
+                                                                ),
+                                                              ),
                                                         )
                                                       : Center(
                                                           child: Icon(
                                                             category == 'Warkop'
-                                                                ? Icons.coffee_rounded
-                                                                : category == 'Restoran'
-                                                                    ? Icons.restaurant_rounded
-                                                                    : Icons.local_cafe_rounded,
+                                                                ? Icons
+                                                                      .coffee_rounded
+                                                                : category ==
+                                                                      'Restoran'
+                                                                ? Icons
+                                                                      .restaurant_rounded
+                                                                : Icons
+                                                                      .local_cafe_rounded,
                                                             color: amberPrimary,
                                                             size: 30,
                                                           ),
@@ -1695,8 +1978,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                 // Information details
                                                 Expanded(
                                                   child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
                                                     children: [
                                                       // Top row: Name + Category Pill + Zone Pill
                                                       Row(
@@ -1704,55 +1990,113 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                           Flexible(
                                                             child: Text(
                                                               '${place['name'] ?? '-'}',
-                                                              style: const TextStyle(
+                                                              style: TextStyle(
                                                                 fontSize: 16,
-                                                                fontWeight: FontWeight.w800,
-                                                                color: Colors.white,
-                                                                letterSpacing: 0.2,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                color:
+                                                                    textPrimary,
+                                                                letterSpacing:
+                                                                    0.2,
                                                               ),
                                                               maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
                                                             ),
                                                           ),
-                                                          const SizedBox(width: 10),
+                                                          const SizedBox(
+                                                            width: 10,
+                                                          ),
                                                           Container(
-                                                            padding: const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 3,
-                                                            ),
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal: 8,
+                                                                  vertical: 3,
+                                                                ),
                                                             decoration: BoxDecoration(
-                                                              color: amberPrimary.withValues(alpha: 0.15),
-                                                              borderRadius: BorderRadius.circular(6),
+                                                              color: amberPrimary
+                                                                  .withValues(
+                                                                    alpha:
+                                                                        isDark
+                                                                        ? 0.15
+                                                                        : 0.12,
+                                                                  ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    6,
+                                                                  ),
                                                               border: Border.all(
-                                                                color: amberPrimary.withValues(alpha: 0.35),
+                                                                color: amberPrimary
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          isDark
+                                                                          ? 0.35
+                                                                          : 0.45,
+                                                                    ),
                                                               ),
                                                             ),
                                                             child: Text(
                                                               category,
                                                               style: TextStyle(
                                                                 fontSize: 11,
-                                                                fontWeight: FontWeight.w700,
-                                                                color: amberPrimary,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color: isDark
+                                                                    ? amberPrimary
+                                                                    : const Color(
+                                                                        0xFFB45309,
+                                                                      ),
                                                               ),
                                                             ),
                                                           ),
-                                                          const SizedBox(width: 6),
+                                                          const SizedBox(
+                                                            width: 6,
+                                                          ),
                                                           Container(
-                                                            padding: const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 3,
-                                                            ),
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal: 8,
+                                                                  vertical: 3,
+                                                                ),
                                                             decoration: BoxDecoration(
-                                                              color: const Color(0xFF1E2E4E),
-                                                              borderRadius: BorderRadius.circular(6),
-                                                              border: Border.all(color: const Color(0xFF2C4372)),
+                                                              color: isDark
+                                                                  ? const Color(
+                                                                      0xFF1E2E4E,
+                                                                    )
+                                                                  : const Color(
+                                                                      0xFFE0F2FE,
+                                                                    ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    6,
+                                                                  ),
+                                                              border: Border.all(
+                                                                color: isDark
+                                                                    ? const Color(
+                                                                        0xFF2C4372,
+                                                                      )
+                                                                    : const Color(
+                                                                        0xFFBAE6FD,
+                                                                      ),
+                                                              ),
                                                             ),
                                                             child: Text(
                                                               city,
-                                                              style: const TextStyle(
+                                                              style: TextStyle(
                                                                 fontSize: 11,
-                                                                fontWeight: FontWeight.w600,
-                                                                color: Color(0xFF90CDF4),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: isDark
+                                                                    ? const Color(
+                                                                        0xFF90CDF4,
+                                                                      )
+                                                                    : const Color(
+                                                                        0xFF0284C7,
+                                                                      ),
                                                               ),
                                                             ),
                                                           ),
@@ -1763,21 +2107,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                       // Address row
                                                       Row(
                                                         children: [
-                                                          const Icon(
-                                                            Icons.location_on_outlined,
+                                                          Icon(
+                                                            Icons
+                                                                .location_on_outlined,
                                                             size: 14,
-                                                            color: Colors.white54,
+                                                            color: textMuted,
                                                           ),
-                                                          const SizedBox(width: 4),
+                                                          const SizedBox(
+                                                            width: 4,
+                                                          ),
                                                           Expanded(
                                                             child: Text(
                                                               '${place['address'] ?? '-'}',
                                                               style: TextStyle(
                                                                 fontSize: 12.5,
-                                                                color: Colors.white.withValues(alpha: 0.7),
+                                                                color:
+                                                                    textSecondary,
                                                               ),
                                                               maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
                                                             ),
                                                           ),
                                                         ],
@@ -1788,61 +2138,93 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                       Wrap(
                                                         spacing: 12,
                                                         runSpacing: 4,
-                                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                                        crossAxisAlignment:
+                                                            WrapCrossAlignment
+                                                                .center,
                                                         children: [
                                                           Row(
-                                                            mainAxisSize: MainAxisSize.min,
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
                                                             children: [
                                                               const Icon(
-                                                                Icons.payments_outlined,
+                                                                Icons
+                                                                    .payments_outlined,
                                                                 size: 14,
-                                                                color: Color(0xFF34D399),
+                                                                color: Color(
+                                                                  0xFF34D399,
+                                                                ),
                                                               ),
-                                                              const SizedBox(width: 4),
+                                                              const SizedBox(
+                                                                width: 4,
+                                                              ),
                                                               Text(
                                                                 'Rp $minP - Rp $maxP',
                                                                 style: const TextStyle(
                                                                   fontSize: 12,
-                                                                  fontWeight: FontWeight.w600,
-                                                                  color: Color(0xFF34D399),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  color: Color(
+                                                                    0xFF34D399,
+                                                                  ),
                                                                 ),
                                                               ),
                                                             ],
                                                           ),
                                                           Row(
-                                                            mainAxisSize: MainAxisSize.min,
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
                                                             children: [
                                                               const Icon(
-                                                                Icons.star_rounded,
+                                                                Icons
+                                                                    .star_rounded,
                                                                 size: 16,
-                                                                color: Color(0xFFFBBF24),
+                                                                color: Color(
+                                                                  0xFFFBBF24,
+                                                                ),
                                                               ),
-                                                              const SizedBox(width: 2),
+                                                              const SizedBox(
+                                                                width: 2,
+                                                              ),
                                                               Text(
                                                                 '$rating ★',
                                                                 style: const TextStyle(
                                                                   fontSize: 12,
-                                                                  fontWeight: FontWeight.w700,
-                                                                  color: Color(0xFFFBBF24),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                  color: Color(
+                                                                    0xFFFBBF24,
+                                                                  ),
                                                                 ),
                                                               ),
                                                             ],
                                                           ),
                                                           if (hours.isNotEmpty)
                                                             Row(
-                                                              mainAxisSize: MainAxisSize.min,
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
                                                               children: [
-                                                                const Icon(
-                                                                  Icons.access_time_rounded,
+                                                                Icon(
+                                                                  Icons
+                                                                      .access_time_rounded,
                                                                   size: 13,
-                                                                  color: Colors.white54,
+                                                                  color:
+                                                                      textMuted,
                                                                 ),
-                                                                const SizedBox(width: 4),
+                                                                const SizedBox(
+                                                                  width: 4,
+                                                                ),
                                                                 Text(
                                                                   hours,
                                                                   style: TextStyle(
-                                                                    fontSize: 12,
-                                                                    color: Colors.white.withValues(alpha: 0.6),
+                                                                    fontSize:
+                                                                        12,
+                                                                    color:
+                                                                        textSecondary,
                                                                   ),
                                                                 ),
                                                               ],
@@ -1856,33 +2238,62 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                                                 // Action Buttons
                                                 Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
                                                     FilledButton.tonalIcon(
                                                       style: FilledButton.styleFrom(
-                                                        backgroundColor: const Color(0xFF1E2D4A),
-                                                        foregroundColor: Colors.white,
-                                                        padding: const EdgeInsets.symmetric(
-                                                          horizontal: 14,
-                                                          vertical: 10,
-                                                        ),
+                                                        backgroundColor: isDark
+                                                            ? const Color(
+                                                                0xFF1E2D4A,
+                                                              )
+                                                            : const Color(
+                                                                0xFFF1F5F9,
+                                                              ),
+                                                        foregroundColor:
+                                                            textPrimary,
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 14,
+                                                              vertical: 10,
+                                                            ),
                                                         shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(8),
-                                                          side: const BorderSide(color: Color(0xFF2F4470)),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
+                                                          side: BorderSide(
+                                                            color: isDark
+                                                                ? const Color(
+                                                                    0xFF2F4470,
+                                                                  )
+                                                                : const Color(
+                                                                    0xFFCBD5E1,
+                                                                  ),
+                                                          ),
                                                         ),
                                                       ),
                                                       onPressed: () async {
-                                                        final edited = await showPlaceEditor(
-                                                          context,
-                                                          place,
-                                                          categories: categories,
-                                                          preferences: preferences,
-                                                        );
-                                                        if (edited == null) return;
+                                                        final edited =
+                                                            await showPlaceEditor(
+                                                              context,
+                                                              place,
+                                                              categories:
+                                                                  categories,
+                                                              preferences:
+                                                                  preferences,
+                                                            );
+                                                        if (edited == null) {
+                                                          return;
+                                                        }
                                                         try {
-                                                          await savePlace(edited);
+                                                          await savePlace(
+                                                            edited,
+                                                          );
                                                           if (context.mounted) {
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            ScaffoldMessenger.of(
+                                                              context,
+                                                            ).showSnackBar(
                                                               SnackBar(
                                                                 content: Text(
                                                                   'Tempat "${edited['name']}" berhasil diperbarui.',
@@ -1892,10 +2303,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                           }
                                                         } catch (e) {
                                                           if (context.mounted) {
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            ScaffoldMessenger.of(
+                                                              context,
+                                                            ).showSnackBar(
                                                               SnackBar(
-                                                                content: Text('$e'),
-                                                                backgroundColor: Colors.redAccent,
+                                                                content: Text(
+                                                                  '$e',
+                                                                ),
+                                                                backgroundColor:
+                                                                    Colors
+                                                                        .redAccent,
                                                               ),
                                                             );
                                                           }
@@ -1909,7 +2326,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                       label: const Text(
                                                         'Edit',
                                                         style: TextStyle(
-                                                          fontWeight: FontWeight.w700,
+                                                          fontWeight:
+                                                              FontWeight.w700,
                                                           fontSize: 13,
                                                         ),
                                                       ),
@@ -1917,12 +2335,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                                     const SizedBox(width: 8),
                                                     IconButton(
                                                       icon: const Icon(
-                                                        Icons.delete_outline_rounded,
+                                                        Icons
+                                                            .delete_outline_rounded,
                                                         color: Colors.redAccent,
                                                         size: 20,
                                                       ),
-                                                      tooltip: 'Hapus Tempat (WADM-5)',
-                                                      onPressed: () => deletePlace(place),
+                                                      tooltip:
+                                                          'Hapus Tempat (WADM-5)',
+                                                      onPressed: () =>
+                                                          deletePlace(place),
                                                     ),
                                                   ],
                                                 ),
@@ -1946,18 +2367,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildSidebar(
     BuildContext context,
+    bool isDark,
     Color navyInput,
     Color navySurface,
     Color navyBorder,
     Color amberPrimary,
+    Color textPrimary,
+    Color textSecondary,
+    Color textMuted,
   ) {
     return Container(
       width: 265,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-        border: Border(
-          right: BorderSide(color: Color(0xFF1E293B), width: 1.5),
-        ),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        border: Border(right: BorderSide(color: navyBorder, width: 1.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2003,17 +2426,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'MAMPIR',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                        color: textPrimary,
                         letterSpacing: 1.5,
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: amberPrimary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
@@ -2040,9 +2466,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF131D33),
+                color: isDark
+                    ? const Color(0xFF131D33)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF1E2C48)),
+                border: Border.all(color: navyBorder),
               ),
               child: Row(
                 children: [
@@ -2061,27 +2489,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Supabase Online',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white70,
+                      color: textSecondary,
                     ),
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E2A44),
+                      color: isDark
+                          ? const Color(0xFF1E2A44)
+                          : const Color(0xFFE2E8F0),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      '${places.length} Data',
-                      style: const TextStyle(
+                      '${places.length} Tempat • $userCount Akun',
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white60,
+                        color: textMuted,
                       ),
                     ),
                   ),
@@ -2090,24 +2523,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           const SizedBox(height: 10),
-          const Divider(height: 1, color: Color(0xFF1E293B)),
+          Divider(height: 1, color: navyBorder),
 
           // 2. Navigation List
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               children: [
-                _buildSidebarSectionTitle('NAVIGASI UTAMA'),
+                _buildSidebarSectionTitle('NAVIGASI UTAMA', textMuted),
                 _buildSidebarItem(
                   icon: Icons.storefront_rounded,
                   label: 'Katalog Tempat',
-                  isActive: true,
-                  onTap: () {},
+                  isActive: _selectedNavIndex == 0,
+                  onTap: () {
+                    setState(() => _selectedNavIndex = 0);
+                  },
+                  isDark: isDark,
                   amberPrimary: amberPrimary,
+                  textPrimary: textPrimary,
+                  textSecondary: textSecondary,
                   trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: amberPrimary.withValues(alpha: 0.2),
+                      color: (_selectedNavIndex == 0 ? amberPrimary : textMuted)
+                          .withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -2115,7 +2557,43 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: amberPrimary,
+                        color: _selectedNavIndex == 0
+                            ? amberPrimary
+                            : textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+                _buildSidebarItem(
+                  icon: Icons.manage_accounts_rounded,
+                  label: 'Aktivitas & Akun',
+                  isActive: _selectedNavIndex == 1,
+                  onTap: () {
+                    setState(() => _selectedNavIndex = 1);
+                    fetchUserCount();
+                  },
+                  isDark: isDark,
+                  amberPrimary: amberPrimary,
+                  textPrimary: textPrimary,
+                  textSecondary: textSecondary,
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (_selectedNavIndex == 1 ? amberPrimary : textMuted)
+                          .withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$userCount',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: _selectedNavIndex == 1
+                            ? amberPrimary
+                            : textMuted,
                       ),
                     ),
                   ),
@@ -2124,10 +2602,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   icon: Icons.analytics_rounded,
                   label: 'Statistik Kuliner (WADM-1)',
                   onTap: showStats,
+                  isDark: isDark,
                   amberPrimary: amberPrimary,
+                  textPrimary: textPrimary,
+                  textSecondary: textSecondary,
                 ),
                 const SizedBox(height: 14),
-                _buildSidebarSectionTitle('MANAJEMEN DATA'),
+                _buildSidebarSectionTitle('MANAJEMEN DATA', textMuted),
                 _buildSidebarItem(
                   icon: Icons.category_rounded,
                   label: 'Kelola Kategori',
@@ -2136,7 +2617,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     title: 'kategori',
                     values: categories,
                   ),
+                  isDark: isDark,
                   amberPrimary: amberPrimary,
+                  textPrimary: textPrimary,
+                  textSecondary: textSecondary,
                 ),
                 _buildSidebarItem(
                   icon: Icons.tune_rounded,
@@ -2146,10 +2630,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     title: 'preferensi/fasilitas',
                     values: preferences,
                   ),
+                  isDark: isDark,
                   amberPrimary: amberPrimary,
+                  textPrimary: textPrimary,
+                  textSecondary: textSecondary,
                 ),
                 const SizedBox(height: 14),
-                _buildSidebarSectionTitle('AKSI & SINKRONISASI'),
+                _buildSidebarSectionTitle('AKSI & SINKRONISASI', textMuted),
                 _buildSidebarItem(
                   icon: Icons.cloud_sync_rounded,
                   label: 'Sinkron Google API',
@@ -2158,26 +2645,45 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       await syncGoogle();
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('$e')),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('$e')));
                       }
                     }
                   },
+                  isDark: isDark,
                   amberPrimary: amberPrimary,
+                  textPrimary: textPrimary,
+                  textSecondary: textSecondary,
                 ),
                 _buildSidebarItem(
                   icon: Icons.refresh_rounded,
                   label: 'Muat Ulang Data',
-                  onTap: loadPlaces,
+                  onTap: () {
+                    loadPlaces();
+                    fetchUserCount();
+                  },
+                  isDark: isDark,
                   amberPrimary: amberPrimary,
+                  textPrimary: textPrimary,
+                  textSecondary: textSecondary,
+                ),
+                const SizedBox(height: 14),
+                _buildSidebarSectionTitle('TEMA TAMPILAN', textMuted),
+                _buildThemeToggle(
+                  isDark,
+                  amberPrimary,
+                  navyInput,
+                  navyBorder,
+                  textPrimary,
+                  textMuted,
                 ),
               ],
             ),
           ),
 
           // 3. User Profile & Logout
-          const Divider(height: 1, color: Color(0xFF1E293B)),
+          Divider(height: 1, color: navyBorder),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -2186,9 +2692,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF131D33),
+                    color: isDark
+                        ? const Color(0xFF131D33)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF1E2C48)),
+                    border: Border.all(color: navyBorder),
                   ),
                   child: Row(
                     children: [
@@ -2205,7 +2713,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -2214,14 +2722,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: textPrimary,
                               ),
                             ),
                             Text(
                               'admin@mampir.id',
                               style: TextStyle(
                                 fontSize: 10.5,
-                                color: Colors.white54,
+                                color: textMuted,
                               ),
                             ),
                           ],
@@ -2238,7 +2746,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.logout_rounded, size: 18, color: Colors.redAccent),
+                        Icon(
+                          Icons.logout_rounded,
+                          size: 18,
+                          color: Colors.redAccent,
+                        ),
                         SizedBox(width: 10),
                         Text(
                           'Keluar Sesi',
@@ -2260,7 +2772,123 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildSidebarSectionTitle(String title) {
+  Widget _buildThemeToggle(
+    bool isDark,
+    Color amberPrimary,
+    Color navyInput,
+    Color navyBorder,
+    Color textPrimary,
+    Color textMuted,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: navyInput,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: navyBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                if (!isDark) toggleAdminTheme();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E2D4A) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: isDark
+                      ? Border.all(color: amberPrimary.withValues(alpha: 0.4))
+                      : null,
+                  boxShadow: isDark
+                      ? [
+                          BoxShadow(
+                            color: amberPrimary.withValues(alpha: 0.2),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.dark_mode_rounded,
+                      size: 15,
+                      color: isDark ? amberPrimary : textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Gelap',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isDark ? FontWeight.w800 : FontWeight.w500,
+                        color: isDark ? Colors.white : textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                if (isDark) toggleAdminTheme();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: !isDark ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: !isDark
+                      ? Border.all(color: amberPrimary.withValues(alpha: 0.6))
+                      : null,
+                  boxShadow: !isDark
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.light_mode_rounded,
+                      size: 15,
+                      color: !isDark ? const Color(0xFFD97706) : textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Terang',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: !isDark ? FontWeight.w800 : FontWeight.w500,
+                        color: !isDark ? const Color(0xFF0F172A) : textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarSectionTitle(String title, Color textMuted) {
     return Padding(
       padding: const EdgeInsets.only(left: 10, bottom: 8),
       child: Text(
@@ -2268,7 +2896,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w800,
-          color: Colors.white.withValues(alpha: 0.35),
+          color: textMuted,
           letterSpacing: 1.2,
         ),
       ),
@@ -2279,17 +2907,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    required bool isDark,
     required Color amberPrimary,
+    required Color textPrimary,
+    required Color textSecondary,
     bool isActive = false,
     Widget? trailing,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: isActive ? amberPrimary.withValues(alpha: 0.15) : Colors.transparent,
+        color: isActive
+            ? amberPrimary.withValues(alpha: isDark ? 0.15 : 0.12)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         border: isActive
-            ? Border.all(color: amberPrimary.withValues(alpha: 0.35))
+            ? Border.all(
+                color: amberPrimary.withValues(alpha: isDark ? 0.35 : 0.45),
+              )
             : null,
       ),
       child: ListTile(
@@ -2298,14 +2933,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
         leading: Icon(
           icon,
           size: 20,
-          color: isActive ? amberPrimary : Colors.white70,
+          color: isActive ? amberPrimary : textSecondary,
         ),
         title: Text(
           label,
           style: TextStyle(
             fontSize: 13,
             fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
-            color: isActive ? Colors.white : Colors.white70,
+            color: isActive
+                ? (isDark ? Colors.white : const Color(0xFFB45309))
+                : textSecondary,
           ),
         ),
         trailing: trailing,
@@ -2319,7 +2956,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Konfirmasi Keluar'),
-        content: const Text('Apakah Anda yakin ingin keluar dari sesi Admin MAMPIR?'),
+        content: const Text(
+          'Apakah Anda yakin ingin keluar dari sesi Admin MAMPIR?',
+        ),
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.pop(dialogCtx, false),
@@ -2341,7 +2980,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 }
 
-Widget _buildDialogSectionHeader(String title, IconData icon, Color amberPrimary) {
+Widget _buildDialogSectionHeader(
+  String title,
+  IconData icon,
+  Color amberPrimary, [
+  Color? navyBorder,
+]) {
   return Padding(
     padding: const EdgeInsets.only(top: 6, bottom: 12),
     child: Row(
@@ -2358,8 +3002,11 @@ Widget _buildDialogSectionHeader(String title, IconData icon, Color amberPrimary
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
-          child: Divider(color: Color(0xFF263353), height: 1),
+        Expanded(
+          child: Divider(
+            color: navyBorder ?? const Color(0xFF263353),
+            height: 1,
+          ),
         ),
       ],
     ),
@@ -2408,32 +3055,43 @@ Future<Map<String, dynamic>?> showPlaceEditor(
     'Purwokerto Barat & Selatan',
   ];
 
-  var selectedCategory = '${source['category'] ?? (categories.firstOrNull?['name'] ?? 'Cafe')}';
+  var selectedCategory =
+      '${source['category'] ?? (categories.firstOrNull?['name'] ?? 'Cafe')}';
   var selectedCity = '${source['city'] ?? 'Purwokerto Kota'}';
   if (!availableZones.contains(selectedCity)) {
     selectedCity = availableZones.first;
   }
 
   // Preferensi / Fasilitas
-  final initialFacilities = ((source['facilities'] as List<dynamic>?) ?? const [])
-      .map((e) => e.toString().trim())
-      .where((e) => e.isNotEmpty)
-      .toSet();
+  final initialFacilities =
+      ((source['facilities'] as List<dynamic>?) ?? const [])
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toSet();
   final Set<String> selectedFacilities = Set.from(initialFacilities);
-  final standardPrefNames = preferences.map((p) => p['name']?.toString() ?? '').toSet();
-  final customList = initialFacilities.where((f) => !standardPrefNames.contains(f)).toList();
+  final standardPrefNames = preferences
+      .map((p) => p['name']?.toString() ?? '')
+      .toSet();
+  final customList = initialFacilities
+      .where((f) => !standardPrefNames.contains(f))
+      .toList();
   final customFacilities = TextEditingController(text: customList.join(', '));
 
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final navyCard = isDark ? const Color(0xFF162035) : Colors.white;
+  final navyBorder = isDark ? const Color(0xFF263353) : const Color(0xFFE2E8F0);
+  final navyInput = isDark ? const Color(0xFF131B30) : const Color(0xFFF1F5F9);
+  final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+  final textSecondary = isDark ? Colors.white70 : const Color(0xFF475569);
+  final textMuted = isDark ? Colors.white54 : const Color(0xFF94A3B8);
   const amberPrimary = Color(0xFFD99B25);
-  const navyCard = Color(0xFF162035);
-  const navyBorder = Color(0xFF263353);
-  const navyInput = Color(0xFF131B30);
 
   return showDialog<Map<String, dynamic>>(
     context: context,
     builder: (dialogCtx) => StatefulBuilder(
       builder: (ctx, setModalState) {
-        final currentCategory = categories.any((item) => item['name'] == selectedCategory)
+        final currentCategory =
+            categories.any((item) => item['name'] == selectedCategory)
             ? selectedCategory
             : (categories.firstOrNull?['name']?.toString());
 
@@ -2441,10 +3099,13 @@ Future<Map<String, dynamic>?> showPlaceEditor(
           backgroundColor: navyCard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: navyBorder, width: 1.5),
+            side: BorderSide(color: navyBorder, width: 1.5),
           ),
           titlePadding: const EdgeInsets.fromLTRB(24, 20, 16, 12),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 8,
+          ),
           actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
           title: Row(
             children: [
@@ -2466,7 +3127,7 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                 ),
               ),
               const SizedBox(width: 14),
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -2474,22 +3135,19 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: textPrimary,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'Perbarui rincian informasi tempat, koordinat peta & fasilitas',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
-                    ),
+                    style: TextStyle(fontSize: 12, color: textMuted),
                   ),
                 ],
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                icon: Icon(Icons.close_rounded, color: textMuted),
                 tooltip: 'Tutup',
                 onPressed: () => Navigator.pop(dialogCtx),
               ),
@@ -2506,7 +3164,12 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // SECTION 1: INFORMASI UTAMA & KATEGORI
-                    _buildDialogSectionHeader('INFORMASI UTAMA & KATEGORI', Icons.storefront_rounded, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'INFORMASI UTAMA & KATEGORI',
+                      Icons.storefront_rounded,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         children: [
@@ -2516,11 +3179,14 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                                 flex: 3,
                                 child: TextField(
                                   controller: name,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Nama Tempat Kuliner *',
                                     hintText: 'Contoh: Cafe & Resto Banyumas',
-                                    prefixIcon: Icon(Icons.storefront_outlined, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.storefront_outlined,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2530,21 +3196,30 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                                 child: DropdownButtonFormField<String>(
                                   initialValue: currentCategory,
                                   dropdownColor: navyCard,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Kategori Tempat *',
-                                    prefixIcon: Icon(Icons.category_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.category_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                   items: categories
                                       .map(
                                         (item) => DropdownMenuItem<String>(
                                           value: '${item['name']}',
-                                          child: Text('${item['name']}'),
+                                          child: Text(
+                                            '${item['name']}',
+                                            style: TextStyle(
+                                              color: textPrimary,
+                                            ),
+                                          ),
                                         ),
                                       )
                                       .toList(),
                                   onChanged: (value) => setModalState(
-                                    () => selectedCategory = value ?? selectedCategory,
+                                    () => selectedCategory =
+                                        value ?? selectedCategory,
                                   ),
                                 ),
                               ),
@@ -2557,16 +3232,25 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                                 child: DropdownButtonFormField<String>(
                                   initialValue: selectedCity,
                                   dropdownColor: navyCard,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Zona Wilayah Banyumas *',
-                                    prefixIcon: Icon(Icons.map_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.map_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                   items: availableZones
                                       .map(
                                         (z) => DropdownMenuItem(
                                           value: z,
-                                          child: Text(z, overflow: TextOverflow.ellipsis),
+                                          child: Text(
+                                            z,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: textPrimary,
+                                            ),
+                                          ),
                                         ),
                                       )
                                       .toList(),
@@ -2579,11 +3263,14 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                               Expanded(
                                 child: TextField(
                                   controller: openHours,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Jam Operasional',
                                     hintText: '09.00 - 22.00 WIB',
-                                    prefixIcon: Icon(Icons.access_time_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.access_time_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2596,13 +3283,18 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                     ),
 
                     // SECTION 2: LOKASI & KOORDINAT GPS
-                    _buildDialogSectionHeader('LOKASI & KOORDINAT GPS', Icons.location_on_outlined, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'LOKASI & KOORDINAT GPS',
+                      Icons.location_on_outlined,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         children: [
                           TextField(
                             controller: address,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: textPrimary),
                             decoration: const InputDecoration(
                               labelText: 'Alamat Lengkap Tempat *',
                               hintText: 'Jl. Jend. Sudirman No. 10, Purwokerto',
@@ -2615,11 +3307,14 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                               Expanded(
                                 child: TextField(
                                   controller: latitude,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Latitude GPS (-7.6 s/d -7.2)',
                                     hintText: 'Contoh: -7.4246',
-                                    prefixIcon: Icon(Icons.my_location_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.my_location_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2627,11 +3322,15 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                               Expanded(
                                 child: TextField(
                                   controller: longitude,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
-                                    labelText: 'Longitude GPS (109.0 s/d 109.5)',
+                                    labelText:
+                                        'Longitude GPS (109.0 s/d 109.5)',
                                     hintText: 'Contoh: 109.2315',
-                                    prefixIcon: Icon(Icons.explore_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.explore_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2644,7 +3343,12 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                     ),
 
                     // SECTION 3: BUDGET & PREFERENSI FASILITAS
-                    _buildDialogSectionHeader('RENTANG BUDGET & FASILITAS', Icons.payments_outlined, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'RENTANG BUDGET & FASILITAS',
+                      Icons.payments_outlined,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2655,11 +3359,14 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                                 child: TextField(
                                   controller: minPrice,
                                   keyboardType: TextInputType.number,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Budget Minimum (Rp)',
                                     hintText: 'Contoh: 15000',
-                                    prefixIcon: Icon(Icons.payments_outlined, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.payments_outlined,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2668,23 +3375,26 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                                 child: TextField(
                                   controller: maxPrice,
                                   keyboardType: TextInputType.number,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Budget Maksimum (Rp)',
                                     hintText: 'Contoh: 50000',
-                                    prefixIcon: Icon(Icons.payments_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.payments_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          const Text(
+                          Text(
                             'Pilih Fasilitas & Preferensi (Klik untuk aktifkan):',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white70,
+                              color: textSecondary,
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -2693,24 +3403,38 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                             runSpacing: 8,
                             children: preferences.map((pref) {
                               final pName = '${pref['name']}';
-                              final isSelected = selectedFacilities.contains(pName);
+                              final isSelected = selectedFacilities.contains(
+                                pName,
+                              );
                               return FilterChip(
                                 label: Text(
                                   pName,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSelected ? Colors.white : Colors.white70,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? (isDark
+                                              ? Colors.white
+                                              : const Color(0xFFB45309))
+                                        : textSecondary,
                                   ),
                                 ),
                                 selected: isSelected,
-                                backgroundColor: navyInput,
-                                selectedColor: amberPrimary.withValues(alpha: 0.25),
+                                backgroundColor: isDark
+                                    ? const Color(0xFF131D33)
+                                    : const Color(0xFFF8FAFC),
+                                selectedColor: amberPrimary.withValues(
+                                  alpha: isDark ? 0.25 : 0.15,
+                                ),
                                 checkmarkColor: amberPrimary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                   side: BorderSide(
-                                    color: isSelected ? amberPrimary : navyBorder,
+                                    color: isSelected
+                                        ? amberPrimary
+                                        : navyBorder,
                                     width: isSelected ? 1.5 : 1,
                                   ),
                                 ),
@@ -2729,11 +3453,16 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                           const SizedBox(height: 12),
                           TextField(
                             controller: customFacilities,
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            style: TextStyle(color: textPrimary, fontSize: 13),
                             decoration: const InputDecoration(
-                              labelText: 'Fasilitas Tambahan Lainnya (Opsional)',
-                              hintText: 'Contoh: Photobooth, Musholla (pisahkan koma)',
-                              prefixIcon: Icon(Icons.playlist_add_rounded, size: 20),
+                              labelText:
+                                  'Fasilitas Tambahan Lainnya (Opsional)',
+                              hintText:
+                                  'Contoh: Photobooth, Musholla (pisahkan koma)',
+                              prefixIcon: Icon(
+                                Icons.playlist_add_rounded,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
@@ -2743,14 +3472,19 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                     ),
 
                     // SECTION 4: MEDIA BANNER & DESKRIPSI
-                    _buildDialogSectionHeader('MEDIA BANNER & DESKRIPSI', Icons.image_outlined, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'MEDIA BANNER & DESKRIPSI',
+                      Icons.image_outlined,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           TextField(
                             controller: image,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: textPrimary),
                             decoration: const InputDecoration(
                               labelText: 'URL Gambar Banner Tempat',
                               hintText: 'https://images.unsplash.com/...',
@@ -2776,34 +3510,58 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                                         child: Image.network(
                                           image.text.trim(),
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) => const Center(
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.broken_image_rounded, color: Colors.white38),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Pratinjau gambar gagal dimuat (URL tidak valid)',
-                                                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => Center(
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons
+                                                          .broken_image_rounded,
+                                                      color: textMuted,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'Pratinjau gambar gagal dimuat (URL tidak valid)',
+                                                      style: TextStyle(
+                                                        color: textMuted,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
-                                            ),
-                                          ),
+                                              ),
                                         ),
                                       ),
                                       Positioned(
                                         top: 8,
                                         right: 8,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.65),
-                                            borderRadius: BorderRadius.circular(6),
+                                            color: Colors.black.withValues(
+                                              alpha: 0.65,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.visibility_rounded, size: 12, color: amberPrimary),
+                                              Icon(
+                                                Icons.visibility_rounded,
+                                                size: 12,
+                                                color: amberPrimary,
+                                              ),
                                               SizedBox(width: 4),
                                               Text(
                                                 'Pratinjau Banner',
@@ -2825,14 +3583,14 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                                       children: [
                                         Icon(
                                           Icons.add_photo_alternate_outlined,
-                                          color: Colors.white.withValues(alpha: 0.3),
+                                          color: textMuted,
                                           size: 28,
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
                                           'Masukkan URL gambar di atas untuk melihat pratinjau banner',
                                           style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.4),
+                                            color: textMuted,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -2844,11 +3602,15 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                           TextField(
                             controller: description,
                             maxLines: 3,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: textPrimary),
                             decoration: const InputDecoration(
                               labelText: 'Deskripsi Singkat Tempat',
-                              hintText: 'Deskripsikan daya tarik, suasana, atau menu unggulan tempat...',
-                              prefixIcon: Icon(Icons.description_outlined, size: 20),
+                              hintText:
+                                  'Deskripsikan daya tarik, suasana, atau menu unggulan tempat...',
+                              prefixIcon: Icon(
+                                Icons.description_outlined,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
@@ -2864,24 +3626,32 @@ Future<Map<String, dynamic>?> showPlaceEditor(
           actions: [
             OutlinedButton(
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: navyBorder),
+                side: BorderSide(color: navyBorder),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
               ),
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
+              child: Text('Batal', style: TextStyle(color: textSecondary)),
             ),
             const SizedBox(width: 8),
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: amberPrimary,
-                foregroundColor: const Color(0xFF0D1326),
+                foregroundColor: isDark
+                    ? const Color(0xFF0D1326)
+                    : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
               ),
               onPressed: () {
                 final n = name.text.trim();
@@ -2909,10 +3679,15 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                     .split(',')
                     .map((e) => e.trim())
                     .where((e) => e.isNotEmpty);
-                final combinedFacilities = {...selectedFacilities, ...customExtras}.toList();
+                final combinedFacilities = {
+                  ...selectedFacilities,
+                  ...customExtras,
+                }.toList();
 
-                final min = int.tryParse(minPrice.text) ?? (source['min_price'] ?? 0);
-                final max = int.tryParse(maxPrice.text) ?? (source['max_price'] ?? 0);
+                final min =
+                    int.tryParse(minPrice.text) ?? (source['min_price'] ?? 0);
+                final max =
+                    int.tryParse(maxPrice.text) ?? (source['max_price'] ?? 0);
 
                 Navigator.pop(dialogCtx, {
                   ...source,
@@ -2924,8 +3699,10 @@ Future<Map<String, dynamic>?> showPlaceEditor(
                   'open_hours': openHours.text.trim(),
                   'category': selectedCategory,
                   'facilities': combinedFacilities,
-                  'latitude': double.tryParse(latitude.text) ?? source['latitude'],
-                  'longitude': double.tryParse(longitude.text) ?? source['longitude'],
+                  'latitude':
+                      double.tryParse(latitude.text) ?? source['latitude'],
+                  'longitude':
+                      double.tryParse(longitude.text) ?? source['longitude'],
                   'min_price': min,
                   'max_price': max,
                   'avg_price': (min + max) ~/ 2,
@@ -2977,16 +3754,21 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
 
   final Set<String> selectedFacilities = {'WiFi', 'Colokan', 'Parkir'};
 
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final navyCard = isDark ? const Color(0xFF162035) : Colors.white;
+  final navyBorder = isDark ? const Color(0xFF263353) : const Color(0xFFE2E8F0);
+  final navyInput = isDark ? const Color(0xFF131B30) : const Color(0xFFF1F5F9);
+  final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+  final textSecondary = isDark ? Colors.white70 : const Color(0xFF475569);
+  final textMuted = isDark ? Colors.white54 : const Color(0xFF94A3B8);
   const amberPrimary = Color(0xFFD99B25);
-  const navyCard = Color(0xFF162035);
-  const navyBorder = Color(0xFF263353);
-  const navyInput = Color(0xFF131B30);
 
   return showDialog<Map<String, dynamic>>(
     context: context,
     builder: (dialogCtx) => StatefulBuilder(
       builder: (ctx, setModalState) {
-        final currentCategory = categories.any((item) => item['name'] == selectedCategory)
+        final currentCategory =
+            categories.any((item) => item['name'] == selectedCategory)
             ? selectedCategory
             : (categories.firstOrNull?['name']?.toString() ?? 'Cafe');
 
@@ -2994,10 +3776,13 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
           backgroundColor: navyCard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: navyBorder, width: 1.5),
+            side: BorderSide(color: navyBorder, width: 1.5),
           ),
           titlePadding: const EdgeInsets.fromLTRB(24, 20, 16, 12),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 8,
+          ),
           actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
           title: Row(
             children: [
@@ -3019,7 +3804,7 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                 ),
               ),
               const SizedBox(width: 14),
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -3027,22 +3812,19 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: textPrimary,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'Daftarkan tempat kuliner atau wisata baru ke database Supabase',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white54,
-                    ),
+                    style: TextStyle(fontSize: 12, color: textMuted),
                   ),
                 ],
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                icon: Icon(Icons.close_rounded, color: textMuted),
                 tooltip: 'Tutup',
                 onPressed: () => Navigator.pop(dialogCtx),
               ),
@@ -3059,7 +3841,12 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // SECTION 1: INFORMASI UTAMA & KATEGORI
-                    _buildDialogSectionHeader('INFORMASI UTAMA & KATEGORI', Icons.storefront_rounded, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'INFORMASI UTAMA & KATEGORI',
+                      Icons.storefront_rounded,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         children: [
@@ -3069,11 +3856,14 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                                 flex: 3,
                                 child: TextField(
                                   controller: name,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Nama Tempat Kuliner *',
                                     hintText: 'Contoh: Kopi Roemah Baturraden',
-                                    prefixIcon: Icon(Icons.storefront_outlined, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.storefront_outlined,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -3083,27 +3873,37 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                                 child: DropdownButtonFormField<String>(
                                   initialValue: currentCategory,
                                   dropdownColor: navyCard,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Kategori Tempat *',
-                                    prefixIcon: Icon(Icons.category_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.category_rounded,
+                                      size: 20,
+                                    ),
                                   ),
-                                  items: (categories.isNotEmpty
-                                          ? categories
-                                          : [
-                                              {'name': 'Cafe'},
-                                              {'name': 'Warkop'},
-                                              {'name': 'Restoran'},
-                                            ])
-                                      .map(
-                                        (item) => DropdownMenuItem<String>(
-                                          value: '${item['name']}',
-                                          child: Text('${item['name']}'),
-                                        ),
-                                      )
-                                      .toList(),
+                                  items:
+                                      (categories.isNotEmpty
+                                              ? categories
+                                              : [
+                                                  {'name': 'Cafe'},
+                                                  {'name': 'Warkop'},
+                                                  {'name': 'Restoran'},
+                                                ])
+                                          .map(
+                                            (item) => DropdownMenuItem<String>(
+                                              value: '${item['name']}',
+                                              child: Text(
+                                                '${item['name']}',
+                                                style: TextStyle(
+                                                  color: textPrimary,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
                                   onChanged: (val) => setModalState(
-                                    () => selectedCategory = val ?? selectedCategory,
+                                    () => selectedCategory =
+                                        val ?? selectedCategory,
                                   ),
                                 ),
                               ),
@@ -3116,16 +3916,25 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                                 child: DropdownButtonFormField<String>(
                                   initialValue: selectedCity,
                                   dropdownColor: navyCard,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Zona Wilayah Banyumas *',
-                                    prefixIcon: Icon(Icons.map_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.map_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                   items: availableZones
                                       .map(
                                         (z) => DropdownMenuItem(
                                           value: z,
-                                          child: Text(z, overflow: TextOverflow.ellipsis),
+                                          child: Text(
+                                            z,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: textPrimary,
+                                            ),
+                                          ),
                                         ),
                                       )
                                       .toList(),
@@ -3138,11 +3947,14 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                               Expanded(
                                 child: TextField(
                                   controller: openHours,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Jam Operasional',
                                     hintText: '09.00 - 22.00 WIB',
-                                    prefixIcon: Icon(Icons.access_time_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.access_time_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -3155,13 +3967,18 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     ),
 
                     // SECTION 2: LOKASI & KOORDINAT GPS
-                    _buildDialogSectionHeader('LOKASI & KOORDINAT GPS', Icons.location_on_outlined, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'LOKASI & KOORDINAT GPS',
+                      Icons.location_on_outlined,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         children: [
                           TextField(
                             controller: address,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: textPrimary),
                             decoration: const InputDecoration(
                               labelText: 'Alamat Lengkap Tempat *',
                               hintText: 'Jl. Raya Purwokerto No. 12',
@@ -3174,11 +3991,14 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                               Expanded(
                                 child: TextField(
                                   controller: latitude,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Latitude GPS (-7.6 s/d -7.2) *',
                                     hintText: '-7.4244',
-                                    prefixIcon: Icon(Icons.my_location_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.my_location_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -3186,11 +4006,15 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                               Expanded(
                                 child: TextField(
                                   controller: longitude,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
-                                    labelText: 'Longitude GPS (109.0 s/d 109.5) *',
+                                    labelText:
+                                        'Longitude GPS (109.0 s/d 109.5) *',
                                     hintText: '109.2302',
-                                    prefixIcon: Icon(Icons.explore_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.explore_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -3203,7 +4027,12 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     ),
 
                     // SECTION 3: BUDGET & PREFERENSI FASILITAS
-                    _buildDialogSectionHeader('RENTANG BUDGET & FASILITAS', Icons.payments_outlined, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'RENTANG BUDGET & FASILITAS',
+                      Icons.payments_outlined,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3214,11 +4043,14 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                                 child: TextField(
                                   controller: minPrice,
                                   keyboardType: TextInputType.number,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Budget Minimum (Rp)',
                                     hintText: '15000',
-                                    prefixIcon: Icon(Icons.payments_outlined, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.payments_outlined,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -3227,23 +4059,26 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                                 child: TextField(
                                   controller: maxPrice,
                                   keyboardType: TextInputType.number,
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: textPrimary),
                                   decoration: const InputDecoration(
                                     labelText: 'Budget Maksimum (Rp)',
                                     hintText: '40000',
-                                    prefixIcon: Icon(Icons.payments_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.payments_rounded,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          const Text(
+                          Text(
                             'Pilih Fasilitas & Preferensi (Klik untuk aktifkan):',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white70,
+                              color: textSecondary,
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -3252,24 +4087,38 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                             runSpacing: 8,
                             children: preferences.map((pref) {
                               final pName = '${pref['name']}';
-                              final isSelected = selectedFacilities.contains(pName);
+                              final isSelected = selectedFacilities.contains(
+                                pName,
+                              );
                               return FilterChip(
                                 label: Text(
                                   pName,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSelected ? Colors.white : Colors.white70,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? (isDark
+                                              ? Colors.white
+                                              : const Color(0xFFB45309))
+                                        : textSecondary,
                                   ),
                                 ),
                                 selected: isSelected,
-                                backgroundColor: navyInput,
-                                selectedColor: amberPrimary.withValues(alpha: 0.25),
+                                backgroundColor: isDark
+                                    ? const Color(0xFF131D33)
+                                    : const Color(0xFFF8FAFC),
+                                selectedColor: amberPrimary.withValues(
+                                  alpha: isDark ? 0.25 : 0.15,
+                                ),
                                 checkmarkColor: amberPrimary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                   side: BorderSide(
-                                    color: isSelected ? amberPrimary : navyBorder,
+                                    color: isSelected
+                                        ? amberPrimary
+                                        : navyBorder,
                                     width: isSelected ? 1.5 : 1,
                                   ),
                                 ),
@@ -3288,11 +4137,16 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                           const SizedBox(height: 12),
                           TextField(
                             controller: customFacilities,
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            style: TextStyle(color: textPrimary, fontSize: 13),
                             decoration: const InputDecoration(
-                              labelText: 'Fasilitas Tambahan Lainnya (Opsional)',
-                              hintText: 'Contoh: Outdoor, Lesehan, Live Musik (pisahkan koma)',
-                              prefixIcon: Icon(Icons.playlist_add_rounded, size: 20),
+                              labelText:
+                                  'Fasilitas Tambahan Lainnya (Opsional)',
+                              hintText:
+                                  'Contoh: Outdoor, Lesehan, Live Musik (pisahkan koma)',
+                              prefixIcon: Icon(
+                                Icons.playlist_add_rounded,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
@@ -3302,14 +4156,19 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     ),
 
                     // SECTION 4: MEDIA BANNER & DESKRIPSI
-                    _buildDialogSectionHeader('MEDIA BANNER & DESKRIPSI', Icons.image_outlined, amberPrimary),
+                    _buildDialogSectionHeader(
+                      'MEDIA BANNER & DESKRIPSI',
+                      Icons.image_outlined,
+                      amberPrimary,
+                      navyBorder,
+                    ),
                     _buildDialogCard(
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           TextField(
                             controller: image,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: textPrimary),
                             decoration: const InputDecoration(
                               labelText: 'URL Gambar Banner Tempat',
                               hintText: 'https://images.unsplash.com/...',
@@ -3335,34 +4194,58 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                                         child: Image.network(
                                           image.text.trim(),
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) => const Center(
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.broken_image_rounded, color: Colors.white38),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Pratinjau gambar gagal dimuat (URL tidak valid)',
-                                                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => Center(
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons
+                                                          .broken_image_rounded,
+                                                      color: textMuted,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'Pratinjau gambar gagal dimuat (URL tidak valid)',
+                                                      style: TextStyle(
+                                                        color: textMuted,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
-                                            ),
-                                          ),
+                                              ),
                                         ),
                                       ),
                                       Positioned(
                                         top: 8,
                                         right: 8,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.65),
-                                            borderRadius: BorderRadius.circular(6),
+                                            color: Colors.black.withValues(
+                                              alpha: 0.65,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.visibility_rounded, size: 12, color: amberPrimary),
+                                              Icon(
+                                                Icons.visibility_rounded,
+                                                size: 12,
+                                                color: amberPrimary,
+                                              ),
                                               SizedBox(width: 4),
                                               Text(
                                                 'Pratinjau Banner',
@@ -3384,14 +4267,14 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                                       children: [
                                         Icon(
                                           Icons.add_photo_alternate_outlined,
-                                          color: Colors.white.withValues(alpha: 0.3),
+                                          color: textMuted,
                                           size: 28,
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
                                           'Masukkan URL gambar di atas untuk melihat pratinjau banner',
                                           style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.4),
+                                            color: textMuted,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -3403,11 +4286,15 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                           TextField(
                             controller: description,
                             maxLines: 3,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: textPrimary),
                             decoration: const InputDecoration(
                               labelText: 'Deskripsi Singkat Tempat',
-                              hintText: 'Deskripsikan konsep, keunikan, atau menu favorit tempat...',
-                              prefixIcon: Icon(Icons.description_outlined, size: 20),
+                              hintText:
+                                  'Deskripsikan konsep, keunikan, atau menu favorit tempat...',
+                              prefixIcon: Icon(
+                                Icons.description_outlined,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
@@ -3423,24 +4310,32 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
           actions: [
             OutlinedButton(
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: navyBorder),
+                side: BorderSide(color: navyBorder),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
               ),
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Batal', style: TextStyle(color: Colors.white70)),
+              child: Text('Batal', style: TextStyle(color: textSecondary)),
             ),
             const SizedBox(width: 8),
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: amberPrimary,
-                foregroundColor: const Color(0xFF0D1326),
+                foregroundColor: isDark
+                    ? const Color(0xFF0D1326)
+                    : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
               ),
               onPressed: () {
                 final n = name.text.trim();
@@ -3495,7 +4390,10 @@ Future<Map<String, dynamic>?> showAddPlaceDialog(
                     .split(',')
                     .map((e) => e.trim())
                     .where((e) => e.isNotEmpty);
-                final facList = {...selectedFacilities, ...customExtras}.toList();
+                final facList = {
+                  ...selectedFacilities,
+                  ...customExtras,
+                }.toList();
 
                 final newId = 'pwt-${DateTime.now().millisecondsSinceEpoch}';
                 final newPlace = {
