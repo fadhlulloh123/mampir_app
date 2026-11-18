@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -42,9 +43,60 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   final email = TextEditingController();
   final password = TextEditingController();
   bool loading = false;
+  bool obscurePassword = true;
+  bool rememberMe = false;
   String? error;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedRemember = prefs.getBool('admin_remember_me') ?? false;
+      final savedEmail = prefs.getString('admin_saved_email') ?? '';
+      if (mounted) {
+        setState(() {
+          rememberMe = savedRemember;
+          if (savedRemember && savedEmail.isNotEmpty) {
+            email.text = savedEmail;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('admin_remember_me', rememberMe);
+      if (rememberMe) {
+        await prefs.setString('admin_saved_email', email.text.trim());
+      } else {
+        await prefs.remove('admin_saved_email');
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
   Future<void> login() async {
+    final cleanEmail = email.text.trim();
+    final cleanPassword = password.text;
+
+    if (cleanEmail.isEmpty || cleanPassword.isEmpty) {
+      setState(() => error = 'Email dan kata sandi admin wajib diisi.');
+      return;
+    }
+
     setState(() {
       loading = true;
       error = null;
@@ -57,8 +109,8 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'email': email.text.trim(),
-          'password': password.text,
+          'email': cleanEmail,
+          'password': cleanPassword,
         }),
       );
       if (response.statusCode != 200) {
@@ -70,6 +122,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       if (token == null || token.isEmpty) {
         throw Exception('Token login tidak tersedia.');
       }
+      await _saveCredentials();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => AdminDashboard(token: token)),
@@ -83,58 +136,616 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     }
   }
 
+  static const Color _amberPrimary = Color(0xFFD99B25);
+  static const Color _amberDark = Color(0xFFB57D18);
+  static const Color _darkSurface = Color(0xFF131316);
+  static const Color _darkInput = Color(0xFF24242C);
+  static const Color _brandDark = Color(0xFF1E1303);
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: SizedBox(
-        width: 420,
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _darkSurface,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 900;
+          if (isWide) {
+            return Row(
               children: [
-                const Icon(Icons.admin_panel_settings, size: 56),
-                const SizedBox(height: 12),
-                Text(
-                  'MAMPIR Admin',
-                  style: Theme.of(context).textTheme.headlineSmall,
+                Expanded(
+                  flex: 5,
+                  child: _buildBrandingPanel(),
                 ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: email,
-                  decoration: const InputDecoration(labelText: 'Email admin'),
+                Expanded(
+                  flex: 6,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 48,
+                        vertical: 32,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: _buildLoginForm(context),
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: password,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  onSubmitted: (_) => login(),
+              ],
+            );
+          }
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildCompactBrandingBanner(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 32,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: _buildLoginForm(context),
+                  ),
                 ),
-                if (error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    error!,
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBrandingPanel() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFF2B039),
+            _amberPrimary,
+            _amberDark,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 48),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -60,
+            top: -60,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -80,
+            bottom: -60,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(
+                      'assets/images/app_icon.jpeg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFF231805),
+                        child: const Icon(
+                          Icons.travel_explore_rounded,
+                          color: Color(0xFFF3B43F),
+                          size: 26,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'MAMPIR',
+                        style: TextStyle(
+                          color: _brandDark,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 22,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      Text(
+                        'PORTAL ADMINISTRASI',
+                        style: TextStyle(
+                          color: Color(0xFF4A3410),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      color: _brandDark,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.22),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/images/app_icon.jpeg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.travel_explore_rounded,
+                          color: Color(0xFFF3B43F),
+                          size: 46,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Kelola Informasi,\nRute, & Komunitas.',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                      color: _brandDark,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      height: 1.2,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Pusat kendali operasional platform MAMPIR untuk kurasi destinasi kuliner dan wisata, moderasi ulasan, serta sinkronisasi data tempat secara real-time.',
+                    style: TextStyle(
+                      color: const Color(0xFF2E1C05).withValues(alpha: 0.85),
+                      fontSize: 14,
+                      height: 1.6,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  _buildBrandingFeatureItem(
+                    Icons.map_rounded,
+                    'Manajemen Tempat & Rute Wisata',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildBrandingFeatureItem(
+                    Icons.category_rounded,
+                    'Kelola Kategori & Ulasan Komunitas',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildBrandingFeatureItem(
+                    Icons.sync_rounded,
+                    'Sinkronisasi Google API & Supabase',
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: _brandDark,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Mampir Admin Suite • Proyek PML 2026',
+                    style: TextStyle(
+                      color: const Color(0xFF2E1C05).withValues(alpha: 0.75),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: loading ? null : login,
-                  child: loading
-                      ? const CircularProgressIndicator()
-                      : const Text('Masuk'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBrandingFeatureItem(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: _brandDark.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _brandDark.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: _brandDark),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: _brandDark,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactBrandingBanner() {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_amberPrimary, _amberDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: _brandDark,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/images/app_icon.jpeg',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.travel_explore_rounded,
+                color: Color(0xFFF3B43F),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'MAMPIR ADMIN',
+                style: TextStyle(
+                  color: _brandDark,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              Text(
+                'Portal Manajemen Administrator',
+                style: TextStyle(
+                  color: Color(0xFF382307),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginForm(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: _amberPrimary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _amberPrimary.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.shield_rounded, size: 14, color: _amberPrimary),
+              SizedBox(width: 6),
+              Text(
+                'Akses Terbatas Admin',
+                style: TextStyle(
+                  color: _amberPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Selamat Datang Kembali 👋',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Silakan masukkan kredensial administrator Anda untuk mengelola data sistem MAMPIR.',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.white.withValues(alpha: 0.65),
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 28),
+        if (error != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7F1D1D).withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Color(0xFFFCA5A5),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    error!,
+                    style: const TextStyle(
+                      color: Color(0xFFFCA5A5),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 20),
+        ],
+        const Text(
+          'Email Administrator',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ),
-    ),
-  );
+        const SizedBox(height: 6),
+        TextField(
+          controller: email,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: 'admin@mampir.id',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+            prefixIcon: const Icon(
+              Icons.email_outlined,
+              color: Colors.white54,
+              size: 20,
+            ),
+            filled: true,
+            fillColor: _darkInput,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: _amberPrimary, width: 1.5),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'Kata Sandi',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: password,
+          obscureText: obscurePassword,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          onSubmitted: (_) => loading ? null : login(),
+          decoration: InputDecoration(
+            hintText: '••••••••',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+            prefixIcon: const Icon(
+              Icons.lock_outline_rounded,
+              color: Colors.white54,
+              size: 20,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: Colors.white54,
+                size: 20,
+              ),
+              onPressed: () =>
+                  setState(() => obscurePassword = !obscurePassword),
+            ),
+            filled: true,
+            fillColor: _darkInput,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: _amberPrimary, width: 1.5),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            SizedBox(
+              height: 24,
+              width: 24,
+              child: Checkbox(
+                value: rememberMe,
+                activeColor: _amberPrimary,
+                checkColor: _brandDark,
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                onChanged: (val) {
+                  setState(() => rememberMe = val ?? false);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => rememberMe = !rememberMe),
+              child: Text(
+                'Ingat saya di perangkat ini',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            onPressed: loading ? null : login,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _amberPrimary,
+              foregroundColor: _brandDark,
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: loading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _brandDark,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text(
+                        'Masuk ke Dashboard',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        Center(
+          child: Text(
+            '© 2026 Tim Proyek PML MAMPIR. Hak Cipta Dilindungi.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.35),
+              fontSize: 11,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class AdminDashboard extends StatefulWidget {
