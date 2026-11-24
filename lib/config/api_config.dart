@@ -37,20 +37,25 @@ class ApiConfig {
     defaultValue: 'mampir://auth-callback',
   );
 
-  // Google Maps API Keys
+  // Google Maps API Keys.
+  //
+  // Jangan hardcode key di source code. Suntikkan saat build/run:
+  //   flutter run \
+  //     --dart-define=GOOGLE_PLACES_API_KEY=... \
+  //     --dart-define=GOOGLE_ROUTES_API_KEY=...
+  //
+  // GOOGLE_MAPS_API_KEY untuk Android Maps SDK diatur lewat
+  // android/gradle.properties (manifestPlaceholder), bukan lewat Dart.
   static const String googleMapsApiKey = String.fromEnvironment(
     'GOOGLE_MAPS_API_KEY',
-    defaultValue: 'AIzaSyDRpM6qUNluR7y-yP-k0UEhSrNQQ84A9nI',
   );
 
   static const String googlePlacesApiKey = String.fromEnvironment(
     'GOOGLE_PLACES_API_KEY',
-    defaultValue: 'AIzaSyDMJEEWy4XuVJSIzvzEVKS6zfwtVjGSYGk',
   );
 
   static const String googleRoutesApiKey = String.fromEnvironment(
     'GOOGLE_ROUTES_API_KEY',
-    defaultValue: 'AIzaSyBucKKuasjZSWCt8DfCCTfw6omaV-qlqX8',
   );
 
   static String get placesEndpoint {

@@ -638,7 +638,7 @@ void main() {
     expect(find.text('Beranda'), findsOneWidget);
     expect(find.text('Cari'), findsOneWidget);
     expect(find.text('Favorit'), findsOneWidget);
-    expect(find.text('Peta'), findsOneWidget);
+    expect(find.text('Dekat'), findsOneWidget);
 
     // Verify 5th tab 'Akun' is completely removed from bottom navigation
     expect(find.text('Akun'), findsNothing);

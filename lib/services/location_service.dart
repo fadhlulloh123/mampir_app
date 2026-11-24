@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'preference_service.dart';
 
 /// ============================================================
 /// LOCATION SERVICE — KELOLA GPS BERAKURASI TINGGI
@@ -22,8 +21,6 @@ class LocationService {
   static LocationService get instance => _instance;
 
   LocationService._internal();
-
-  final PreferenceService _prefService = PreferenceService();
 
   Position? _currentPosition;
   DateTime? _lastFetchTime;
@@ -79,18 +76,14 @@ class LocationService {
   /// Memeriksa dan meminta izin lokasi pengguna
   Future<bool> checkAndRequestPermission() async {
     try {
-      final enabledInSettings = await _prefService.isLocationEnabled();
-      if (!enabledInSettings) {
-        return false;
-      }
-
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         return false;
       }
 
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.unableToDetermine) {
         permission = await Geolocator.requestPermission();
       }
 

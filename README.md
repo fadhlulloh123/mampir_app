@@ -22,6 +22,10 @@ Aplikasi ini berfokus pada rekomendasi tempat berdasarkan:
   - Simpan tempat favorit dan lihat kembali di tab favorit.
 - **Peta & Rute**
   - Tampilkan marker lokasi tempat dan buka navigasi ke Google Maps.
+- **Near Me / Tempat Terdekat**
+  - Deteksi GPS real-time, filter radius (0–1, 1–3, 3–5, 5–10, >10 km),
+    filter kategori, sorting terdekat/rating tertinggi, peta Google Maps,
+    dan daftar kartu tempat dengan detail serta petunjuk arah.
 
 
 - **Pengaturan & Notifikasi**
@@ -32,7 +36,9 @@ Aplikasi ini berfokus pada rekomendasi tempat berdasarkan:
 - **Flutter** + **Dart**
 - `http` (REST API)
 - `shared_preferences` (penyimpanan lokal)
-- `flutter_map` + `latlong2` (OpenStreetMap)
+- `google_maps_flutter` (peta Google Maps untuk Near Me)
+- `geolocator` (deteksi GPS real-time)
+- `flutter_map` + `latlong2` (peta alternatif/OpenStreetMap)
 - `url_launcher` (buka Google Maps)
 - `intl` (format mata uang/dll)
 
@@ -74,8 +80,10 @@ platform. Jangan menulis key langsung ke source code atau commit ke GitHub.
 Key yang pernah dibagikan atau tertanam di source sebaiknya segera di-rotate
 dari Google Cloud Console.
 
-Untuk Android, tambahkan key yang sudah dibatasi ke `android/gradle.properties`
-sebagai `GOOGLE_MAPS_API_KEY=...`; manifest mengambilnya melalui placeholder.
+Untuk Android, tambahkan key yang sudah dibatasi ke `android/local.properties`
+sebagai `GOOGLE_MAPS_API_KEY=...`; file tersebut sudah di-gitignore sehingga
+key tidak ikut ter-commit. Manifest mengambilnya melalui placeholder dari
+`android/app/build.gradle.kts`.
 
 Jalankan [supabase_setup.sql](supabase_setup.sql) pada SQL Editor Supabase.
 Katalog mobile membaca tabel `places`; nilai Google menjadi baseline dan

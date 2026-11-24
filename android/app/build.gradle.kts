@@ -1,7 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Baca GOOGLE_MAPS_API_KEY dari android/local.properties (di-gitignore)
+// agar key tidak ikut ter-commit ke repository.
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
 }
 
 android {
@@ -24,7 +35,9 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
-            project.findProperty("GOOGLE_MAPS_API_KEY")?.toString() ?: ""
+            localProperties.getProperty("GOOGLE_MAPS_API_KEY")
+                ?: project.findProperty("GOOGLE_MAPS_API_KEY")?.toString()
+                ?: ""
     }
 
     buildTypes {

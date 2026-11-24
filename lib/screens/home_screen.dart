@@ -12,6 +12,7 @@ import '../services/recommendation_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/budget_filter_modal.dart';
 
+import 'nearby_screen.dart';
 import 'notification_screen.dart';
 import 'place_detail_screen.dart';
 import 'route_screen.dart';
@@ -324,7 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildHomeTab(),
                 _buildSearchTab(),
                 _buildFavoritesTab(),
-                _buildMapTab(),
+                // Tab "Dekat" membuka NearbyScreen lewat Navigator, jadi
+                // placeholder ini hanya menjaga indeks IndexedStack tetap valid.
+                const SizedBox.shrink(),
               ],
             ),
       bottomNavigationBar: _buildBottomNavigationBar(),
@@ -361,7 +364,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: _buildNavItem(2, Icons.favorite_rounded, 'Favorit'),
               ),
-              Expanded(child: _buildNavItem(3, Icons.map_outlined, 'Peta')),
+              Expanded(
+                child: _buildNavItem(3, Icons.near_me_rounded, 'Dekat'),
+              ),
             ],
           ),
         ),
@@ -374,14 +379,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final isActive = _currentTabIndex == index;
     return GestureDetector(
       onTap: () async {
+        if (index == 3) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NearbyScreen()),
+          );
+          return;
+        }
         setState(() => _currentTabIndex = index);
         // Reload favorit setiap pindah tab agar sinkronisasi selalu up-to-date
         final favs = await _prefService.getFavorites();
         if (mounted) {
           setState(() => _favoriteIds = favs.toSet());
-        }
-        if (index == 3 && _userLocation == null) {
-          _fetchUserGpsLocation(moveMap: true);
         }
       },
       behavior: HitTestBehavior.opaque,
@@ -1600,7 +1609,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ===========================================================================
   // TAB 4: PETA (OPENSTREETMAP VIA FLUTTER_MAP)
+  // ---------------------------------------------------------------------------
+  // Tidak dipakai lagi di bottom navigation: tab "Dekat" sekarang membuka
+  // NearbyScreen (Google Maps). Kode ini disimpan sebagai referensi/fallback.
   // ===========================================================================
+  // ignore: unused_element
   Widget _buildMapTab() {
     final colors = AppTheme.colors(context);
     return Stack(

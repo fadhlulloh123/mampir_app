@@ -12,15 +12,49 @@ import '../models/place_model.dart';
 /// di wilayah Purwokerto dan sekitarnya lengkap dengan rating nyata,
 /// jumlah ulasan nyata, alamat jalan asli, dan koordinat GPS asli.
 /// ============================================================
+class PlacesApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  PlacesApiException(this.message, {this.statusCode});
+
+  @override
+  String toString() => message;
+}
+
 class GooglePlacesService {
   static const String _endpoint =
       'https://places.googleapis.com/v1/places:searchText';
+  static const String _nearbyEndpoint =
+      'https://places.googleapis.com/v1/places:searchNearby';
+
+  /// Tipe yang dipakai saat filter kategori = "Semua", supaya hasil
+  /// tetap relevan (tempat makan/minum/nongkrong), bukan tempat acak.
+  static const List<String> nearbyAllTypes = [
+    'restaurant',
+    'cafe',
+    'coffee_shop',
+    'fast_food_restaurant',
+    'meal_takeaway',
+    'bar',
+  ];
+
+  /// Pemetaan kategori UI MAMPIR -> tipe Google Places API (New).
+  static const Map<String, List<String>> nearbyCategoryTypes = {
+    'Restoran': ['restaurant'],
+    'Warung Makan': ['restaurant', 'meal_takeaway'],
+    'Cafe': ['cafe'],
+    'Coffee Shop': ['coffee_shop'],
+    'Tempat Nongkrong': ['cafe', 'bar'],
+    'Fast Food': ['fast_food_restaurant'],
+  };
 
   final http.Client _client;
   final Map<String, List<PlaceModel>> _cache = {};
 
   GooglePlacesService({http.Client? client})
     : _client = client ?? http.Client();
+
+  String get _apiKey => ApiConfig.googlePlacesApiKey;
 
   /// Cari tempat makan di Purwokerto berdasarkan kata kunci asli pengguna.
   /// Contoh: "ayam penyet", "soto", "cafe baturraden", "mendoan".
@@ -74,7 +108,11 @@ class GooglePlacesService {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': ApiConfig.googlePlacesApiKey,
           'X-Goog-FieldMask':
-              'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.primaryType,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions,places.photos',
+              'places.id,places.displayName,places.formattedAddress,'
+              'places.location,places.rating,places.userRatingCount,'
+              'places.priceLevel,places.primaryType,places.types,'
+              'places.editorialSummary,places.regularOpeningHours.openNow,'
+              'places.regularOpeningHours.weekdayDescriptions,places.photos',
         },
         body: body,
       );
@@ -101,6 +139,109 @@ class GooglePlacesService {
     }
   }
 
+  /// Cari tempat di sekitar koordinat menggunakan Places API (New)
+  /// `places:searchNearby`. Radius dalam kilometer, tipe mengikuti
+  /// [nearbyCategoryTypes] atau daftar tipe Google Places langsung.
+  Future<List<PlaceModel>> searchNearby({
+    required double latitude,
+    required double longitude,
+    required double radiusKm,
+    List<String>? includedTypes,
+    String? keyword,
+    int maxResultCount = 20,
+    String rankPreference = 'DISTANCE',
+  }) async {
+    if (_apiKey.isEmpty) {
+      throw PlacesApiException(
+        'Google Places API key belum dikonfigurasi. '
+        'Jalankan aplikasi dengan --dart-define=GOOGLE_PLACES_API_KEY=...',
+      );
+    }
+
+    final radiusMeters = (radiusKm <= 0 ? 50000.0 : radiusKm * 1000.0)
+        .clamp(1.0, 50000.0);
+    final types = includedTypes
+        ?.map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+    final normalizedKeyword = keyword?.trim() ?? '';
+    final cacheKey =
+        'nearby_${latitude.toStringAsFixed(5)}_'
+        '${longitude.toStringAsFixed(5)}_'
+        '${radiusMeters.toStringAsFixed(0)}_'
+        '${types?.join(',') ?? ''}_$normalizedKeyword'
+        '_${rankPreference.toLowerCase()}';
+
+    if (_cache.containsKey(cacheKey)) {
+      return _cache[cacheKey]!;
+    }
+
+    try {
+      final body = jsonEncode({
+        'locationRestriction': {
+          'circle': {
+            'center': {'latitude': latitude, 'longitude': longitude},
+            'radius': radiusMeters,
+          },
+        },
+        'maxResultCount': maxResultCount,
+        'languageCode': 'id',
+        'rankPreference': rankPreference,
+        if (types != null && types.isNotEmpty) 'includedTypes': types,
+        if (normalizedKeyword.isNotEmpty) 'keyword': normalizedKeyword,
+      });
+
+      final response = await _client.post(
+        Uri.parse(_nearbyEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _apiKey,
+          'X-Goog-FieldMask':
+              'places.id,places.displayName,places.formattedAddress,'
+              'places.location,places.rating,places.userRatingCount,'
+              'places.priceLevel,places.primaryType,places.types,'
+              'places.editorialSummary,places.regularOpeningHours.openNow,'
+              'places.regularOpeningHours.weekdayDescriptions,places.photos',
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        String detail = '';
+        try {
+          final errorJson = jsonDecode(response.body) as Map<String, dynamic>;
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          detail = error?['message'] as String? ?? '';
+        } catch (_) {}
+        throw PlacesApiException(
+          detail.isNotEmpty
+              ? 'Google Places API gagal (${response.statusCode}): $detail'
+              : 'Google Places API gagal (${response.statusCode}).',
+          statusCode: response.statusCode,
+        );
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final placesJson = data['places'] as List<dynamic>?;
+      if (placesJson == null || placesJson.isEmpty) {
+        _cache[cacheKey] = const [];
+        return const [];
+      }
+
+      final results = placesJson
+          .map((item) => _mapPlaceToModel(item as Map<String, dynamic>))
+          .whereType<PlaceModel>()
+          .toList();
+
+      _cache[cacheKey] = results;
+      return results;
+    } on PlacesApiException {
+      rethrow;
+    } catch (e) {
+      throw PlacesApiException('Gagal menghubungi Google Places API: $e');
+    }
+  }
+
   /// Konversi data asli dari Google Places API (New) ke PlaceModel
   PlaceModel? _mapPlaceToModel(Map<String, dynamic> item) {
     try {
@@ -112,24 +253,37 @@ class GooglePlacesService {
           displayNameObj?['text'] as String? ?? 'Tempat Makan Purwokerto';
 
       final locationObj = item['location'] as Map<String, dynamic>?;
-      final lat = (locationObj?['latitude'] as num?)?.toDouble() ?? -7.4244;
-      final lng = (locationObj?['longitude'] as num?)?.toDouble() ?? 109.2304;
+      if (locationObj == null) return null;
+      final lat = (locationObj['latitude'] as num?)?.toDouble();
+      final lng = (locationObj['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null) return null;
 
       final formattedAddress =
           item['formattedAddress'] as String? ??
           'Purwokerto, Banyumas, Jawa Tengah';
-      final rating = (item['rating'] as num?)?.toDouble() ?? 4.3;
-      final userRatingCount = (item['userRatingCount'] as num?)?.toInt() ?? 120;
+      final rating = (item['rating'] as num?)?.toDouble() ?? 0.0;
+      final userRatingCount = (item['userRatingCount'] as num?)?.toInt() ?? 0;
       final priceLevel = item['priceLevel'] as String?;
       final primaryType = item['primaryType'] as String? ?? '';
       final summaryObj = item['editorialSummary'] as Map<String, dynamic>?;
-      final description =
-          summaryObj?['text'] as String? ??
-          'Data tempat dari Google Maps dengan rating $rating dan $userRatingCount ulasan.';
+      final description = summaryObj?['text'] as String? ??
+          (rating > 0
+              ? 'Data tempat dari Google Maps dengan rating $rating '
+                  'dan $userRatingCount ulasan.'
+              : 'Data tempat dari Google Maps.');
       final openingObj = item['regularOpeningHours'] as Map<String, dynamic>?;
       final openingDays = (openingObj?['weekdayDescriptions'] as List<dynamic>?)
           ?.whereType<String>()
           .toList();
+      final openNow = openingObj?['openNow'] as bool?;
+      final openStatus = openNow == null
+          ? null
+          : (openNow ? 'Buka sekarang' : 'Tutup sekarang');
+      final openHoursText = <String>[
+        ?openStatus,
+        if (openingDays != null && openingDays.isNotEmpty)
+          openingDays.join('; '),
+      ].join(' • ');
 
       // Deteksi Wilayah Kota/Kecamatan dari Alamat Asli
       String city = 'Purwokerto Kota';
@@ -151,21 +305,40 @@ class GooglePlacesService {
         city = 'Purwokerto Selatan';
       }
 
-      // Deteksi Kategori: Cafe, Warkop, Restoran
-      String category = 'Restoran';
+      // Deteksi kategori untuk kartu Near Me.
+      final rawTypes = (item['types'] as List<dynamic>?)
+              ?.whereType<String>()
+              .map((t) => t.toLowerCase())
+              .toList() ??
+          const <String>[];
       final nameLower = name.toLowerCase();
-      final typeLower = primaryType.toLowerCase();
-      if (nameLower.contains('kopi') ||
-          nameLower.contains('coffee') ||
-          nameLower.contains('cafe') ||
-          typeLower.contains('cafe') ||
-          typeLower.contains('coffee_shop')) {
-        category = 'Cafe';
+      final typeLower = <String>[
+        primaryType.toLowerCase(),
+        ...rawTypes,
+      ].join(' ');
+
+      String category = 'Restoran';
+      if (typeLower.contains('fast_food_restaurant') ||
+          nameLower.contains('fast food') ||
+          nameLower.contains('kfc') ||
+          nameLower.contains('mcdonald')) {
+        category = 'Fast Food';
+      } else if (typeLower.contains('coffee_shop')) {
+        category = 'Coffee Shop';
       } else if (nameLower.contains('warkop') ||
           nameLower.contains('angkringan') ||
           nameLower.contains('wedangan') ||
-          nameLower.contains('warung kopi')) {
-        category = 'Warkop';
+          nameLower.contains('warung kopi') ||
+          nameLower.contains('warung makan') ||
+          nameLower.contains('warteg')) {
+        category = 'Warung Makan';
+      } else if (typeLower.contains('cafe') ||
+          nameLower.contains('kopi') ||
+          nameLower.contains('coffee') ||
+          nameLower.contains('cafe')) {
+        category = 'Cafe';
+      } else if (typeLower.contains('bar')) {
+        category = 'Tempat Nongkrong';
       }
 
       // Estimasi Budget berdasarkan PriceLevel Google
@@ -220,9 +393,9 @@ class GooglePlacesService {
         reviewCount: userRatingCount,
         address: formattedAddress,
         description: description,
-        openHours: openingDays == null || openingDays.isEmpty
+        openHours: openHoursText.isEmpty
             ? 'Jam buka tidak tersedia di Google Maps'
-            : openingDays.join('; '),
+            : openHoursText,
         latitude: lat,
         longitude: lng,
         imageUrl: imageUrl,
