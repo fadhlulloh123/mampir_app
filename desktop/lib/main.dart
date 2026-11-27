@@ -621,7 +621,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         ),
         const SizedBox(height: 20),
         Text(
-          'Â© 2026 Tim Proyek PML MAMPIR',
+          '© 2026 Tim Proyek PML MAMPIR',
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.35),
             fontSize: 11,
@@ -797,7 +797,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
           decoration: InputDecoration(
             labelText: 'Kata Sandi',
             labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-            hintText: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢',
+            hintText: '••••••••',
             hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
             prefixIcon: const Icon(
               Icons.lock_outline_rounded,
@@ -924,7 +924,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         _buildFormSide(),
         const SizedBox(height: 24),
         Text(
-          'Â© 2026 Tim Proyek PML MAMPIR',
+          '© 2026 Tim Proyek PML MAMPIR',
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.35),
             fontSize: 11,
@@ -2521,33 +2521,41 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Supabase Online',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: textSecondary,
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Supabase Online',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: textSecondary,
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1E2A44)
-                          : const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '${places.length} Tempat â€¢ $userCount Akun',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: textMuted,
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E2A44)
+                            : const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${places.length} Tempat • $userCount Akun',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: textMuted,
+                        ),
                       ),
                     ),
                   ),

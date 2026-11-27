@@ -192,42 +192,6 @@ class _UserActivityPageState extends State<UserActivityPage> {
     }
   }
 
-  Future<void> sendTestActivityLog() async {
-    try {
-      final resp = await http.post(
-        Uri.parse('${widget.supabaseUrl}/rest/v1/user_activities'),
-        headers: headers,
-        body: jsonEncode({
-          'email': 'admin@mampir.id',
-          'action': 'ADMIN_MONITOR',
-          'details': 'Administrator memantau koneksi data & aktivitas pengguna',
-        }),
-      );
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Catatan aktivitas uji coba berhasil dikirim ke Supabase!'),
-              backgroundColor: Color(0xFF10B981),
-            ),
-          );
-        }
-        await loadUsersAndActivities();
-      } else {
-        throw Exception('Status ${resp.statusCode}: ${resp.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal mengirim log: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
-  }
-
   void showUserDetailDialog(Map<String, dynamic> user) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navyCard = isDark ? const Color(0xFF162035) : Colors.white;
@@ -822,25 +786,6 @@ class _UserActivityPageState extends State<UserActivityPage> {
                       await loadUsersAndActivities();
                     }
                   },
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.send_rounded, size: 16),
-                  label: const Text('Kirim Log Uji Coba'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: amberPrimary,
-                    side: BorderSide(
-                      color: amberPrimary.withValues(alpha: 0.5),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: sendTestActivityLog,
                 ),
                 const SizedBox(width: 10),
                 FilledButton.icon(
@@ -1618,16 +1563,6 @@ class _UserActivityPageState extends State<UserActivityPage> {
             Text(
               'Aktivitas akan otomatis muncul saat pengguna login atau melakukan aksi di aplikasi mobile/desktop.',
               style: TextStyle(fontSize: 12.5, color: textMuted),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              icon: const Icon(Icons.send_rounded, size: 16),
-              label: const Text('Buat Log Uji Coba Sekarang'),
-              style: FilledButton.styleFrom(
-                backgroundColor: amberPrimary,
-                foregroundColor: Colors.black87,
-              ),
-              onPressed: sendTestActivityLog,
             ),
           ],
         ),
