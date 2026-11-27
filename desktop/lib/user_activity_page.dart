@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
+import 'tambah_admin.dart';
+
 /// ==============================================================
 /// USER ACTIVITY & ACCOUNT MONITORING PAGE (MAMPIR ADMIN DASHBOARD)
 /// ==============================================================
@@ -785,6 +787,44 @@ class _UserActivityPageState extends State<UserActivityPage> {
             Row(
               children: [
                 OutlinedButton.icon(
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                  label: const Text('Tambah Akun Admin'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF10B981),
+                    side: BorderSide(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final created = await showCreateAdminDialog(
+                      context,
+                      token: widget.token,
+                      supabaseUrl: widget.supabaseUrl,
+                      supabaseAnonKey: widget.supabaseAnonKey,
+                    );
+                    if (created && mounted) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Akun admin baru berhasil dibuat dan tercatat di Supabase!',
+                          ),
+                          backgroundColor: Color(0xFF10B981),
+                        ),
+                      );
+                      await loadUsersAndActivities();
+                    }
+                  },
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
                   icon: const Icon(Icons.send_rounded, size: 16),
                   label: const Text('Kirim Log Uji Coba'),
                   style: OutlinedButton.styleFrom(
@@ -1252,6 +1292,8 @@ class _UserActivityPageState extends State<UserActivityPage> {
                           (u['online_status'] as String? ?? 'Offline').trim();
                       final lastSignIn = u['last_sign_in_at'] as String?;
                       final createdAt = u['created_at'] as String?;
+                      final role = (u['role'] as String? ?? '').toLowerCase();
+                      final isAdmin = role == 'admin';
 
                       final isOnline = status == 'Online';
                       final isNever = lastSignIn == null;
@@ -1297,15 +1339,49 @@ class _UserActivityPageState extends State<UserActivityPage> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          displayName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: textPrimary,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                displayName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: textPrimary,
+                                                ),
+                                              ),
+                                            ),
+                                            if (isAdmin) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: amberPrimary
+                                                      .withValues(alpha: 0.16),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                  border: Border.all(
+                                                    color: amberPrimary
+                                                        .withValues(alpha: 0.5),
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  'ADMIN',
+                                                  style: TextStyle(
+                                                    fontSize: 9.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: amberPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                         Row(
                                           children: [
